@@ -1,11 +1,26 @@
 
 import re
 
+def roprop(prop):
+    def _mod(cls):
+        setattr(cls, prop,
+                property(lambda self: getattr(self, '_' + prop)))
+        return cls
+    return _mod
+
+def neq(cls):
+    def _ne(self, dst):
+        return not self.__eq__(dst)
+    cls.__ne__ = _ne
+    return cls
+
+@neq
+@roprop('elms')
 class grp_word_basis(object):
 
     def __init__(self, names):
         elms = []
-        for n in names:
+        for n in set(names):
             if type(n) in [int, long]:
                 raise TypeError("name shouldn't be int")
             elms.append(n)
@@ -13,8 +28,17 @@ class grp_word_basis(object):
         self._elms = elms
 
     @property
-    def elms(self):
-        return self._elms
+    def id_elm(self):
+        return self._ident_pres()
+
+    @property
+    def gen_elms(self):
+        return [self._elms[i] for i in range(0, len(self._elms), 2)]
+
+    @property
+    def inv_elms(self):
+        assert len(self._elms) % 2 == 0
+        return [self._elms[i + 1] for i in range(0, len(self._elms), 2)]
 
     def _ident_pres(self):
         return '<id>'
@@ -41,20 +65,16 @@ class grp_word_basis(object):
     def __eq__(self, dst):
         return self.elms == dst.elms
 
-    def __ne__(self, dst):
-        return not self.__eq__(dst)
-
     def __add__(self, dst):
         if self == dst:
             return self
         else:
-            elms = list(self.elms)
-            for i in dst.elms:
-                if not i in elms:
-                    elms.append(i)
-            r = type(self)([])
-            r._elms = elms
+            r = type(self)(self.gen_elms + dst.gen_elms)
             return r
+
+    def __len__(self):
+        assert len(self._elms) % 2 == 0
+        return len(self._elms) / 2
 
     def gen(self, n):
         if n == self._ident_pres():
@@ -80,11 +100,14 @@ class grp_word_basis(object):
         else:
             return list(self._gens)
 
+@neq
+@roprop('basis')
+@roprop('seq')
 class grp_word(object):
 
     def __init__(self, wl, basis):
-        self.basis = basis
-        self.seq = wl
+        self._basis = basis
+        self._seq = wl
 
     def exp_resp(self):
         wr = []
@@ -111,7 +134,22 @@ class grp_word(object):
         return wr, cr
 
     def mapped(self, gens):
-        pass
+        if len(gens) < len(self.basis):
+            raise ValueError(
+                "gens shoud have at least {0}".format(len(self.basis)))
+        trans_dict = {
+            syl: gen for gen, syl in zip(gens, self.basis.gen_elms)}
+        rslt = None
+        for syl, cnt in zip(*self.exp_resp()):
+            word = trans_dict[syl] ** cnt
+            if rslt == None:
+                rslt = word
+            else:
+                rslt *= word
+        return rslt
+
+    def __eq__(self, dst):
+        return self.basis == dst.basis and self.seq == dst.seq
 
     def __mul__(self, dst):
         return type(self)(self.seq + dst.seq, self.basis + dst.basis)
@@ -151,14 +189,64 @@ class fpgrp_element(grp_element):
 
     def __init__(self, grp, word):
         self.group = grp
-        
+        self.word = word
 
-class group(object):
+    def __mul__(self, dst):
+        pass
+
+    def __pow__(self, dst):
+        pass
+
+class base_group(object):
     pass
 
-class fp_group(group):
+@neq
+@roprop('frgroup')
+@roprop('gens')
+@roprop('rels')
+class fp_group(base_group):
 
-    def __init__(self, gens, rels):
+    def __new__(cls, frgrp, rels):
+        if not rels:
+            return frgrp
+        else:
+            return super(fp_group, cls).__new__(cls)
+
+    def __init__(self, frgrp, rels):
+        self._frgroup = frgrp
+        self._gens = [fpgrp_element(self, g) for g in frgrp.gens]
+        for rel in rels:
+            if not rel in frgrp:
+                raise ValueError("relator {0} is invalid".format(rel))
+        self._rels = list(set(rels))
+
+    def __eq__(self, dst):
+        return (
+            self.frgroup == dst.frgroup ) and (
+            self.gens == dst.gens ) and (
+            self.rels == dst.rels )
+
+@neq
+@roprop('gens')
+class free_group(base_group):
+
+    def __init__(self, basis, gens = None):
+        if not isinstance(basis, grp_word_basis):
+            basis = grp_word_basis(basis)
+        if not gens:
+            self._gens = basis.gens()
+        else:
+            self._gens = []
+            for gen in gens:
+                if not isinstance(gen, grp_word):
+                    gen = basis.gen(gen)
+                self._gens.append(gen)
+        self._gens = list(set(self._gens))
+
+    def __eq__(self, dst):
+        return self.gens == dst.gens
+
+    def __contains__(self, dst):
         pass
 
 class valid_fp_group(fp_group):
