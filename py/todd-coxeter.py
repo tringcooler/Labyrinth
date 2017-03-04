@@ -3,6 +3,7 @@ from util import *
 
 @roprop('gens')
 @roprop('states')
+@roprop('statid')
 class gen_table(object):
 
     def __init__(self, gens_num):
@@ -11,7 +12,7 @@ class gen_table(object):
         self._states = {}
 
     def __len__(self):
-        return len(self.tbl)
+        return len(self.states)
 
     def alloc(self):
         state = vchain()
@@ -84,16 +85,68 @@ class gen_table(object):
                     print str(gen) + ':', _s(self.trans(sta, gen)),
             print
 
-class rel_table(object):
+    def resort(self):
+        stid = 0
+        nstates = {}
+        for i in sorted(self.states.keys()):
+            sta = self.states[i]
+            sta.id = stid
+            nstates[stid] = sta
+            stid += 1
+        self._states = nstates
+        self._statid = stid
 
-    def __init__(self):
-        pass
+@roprop('rel')
+@roprop('gtbl')
+class rel_chain(object):
 
+    def __init__(self, gen_tbl, rel):
+        assert len(rel) > 0
+        self._rel = rel
+        self._gtbl = gen_tbl
+
+    def deduce(self, sta):
+        cur = sta
+        for gen in self.rel[:-1]:
+            nxt = self.gtbl.trans(cur, gen)
+            if not nxt:
+                nxt = self.gtbl.alloc()
+                self.gtbl.record(cur, gen, nxt)
+            cur = nxt
+        self.gtbl.record(cur, self.rel[-1], sta)
+
+@roprop('gentbl')
+@roprop('reltbl')
+@roprop('subtbl')
 class coset_table(object):
 
+    noresult = type('noresult', (Exception,), {})
+
     def __init__(self, gens_num, rels, subs):
-        self.gentbl = gen_table(gens_num)
-        #self.reltbl =
-        #self.subtbl = 
-        
-    
+        self._gentbl = gen_table(gens_num)
+        self._reltbl = [
+            rel_chain(self.gentbl, rel) for rel in rels]
+        self._subtbl = [
+            rel_chain(self.gentbl, sub) for sub in subs]
+
+    def run(self, max_idx = 50000):
+        if len(self.gentbl):
+            raise RuntimeError('already run')
+        self.gentbl.alloc()
+        sta_idx = 0
+        while sta_idx < self.gentbl.statid:
+            if sta_idx > max_idx:
+                raise self.noresult(sta_idx)
+            try:
+                sta = self.gentbl.states[sta_idx]
+            except KeyError:
+                continue
+            finally:
+                sta_idx += 1
+            if sta_idx == 1:
+                for chain in self.subtbl:
+                    chain.deduce(sta)
+            for chain in self.reltbl:
+                chain.deduce(sta)
+        self.gentbl.resort()
+
