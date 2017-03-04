@@ -1,18 +1,7 @@
 
 import re
 
-def roprop(prop):
-    def _mod(cls):
-        setattr(cls, prop,
-                property(lambda self: getattr(self, '_' + prop)))
-        return cls
-    return _mod
-
-def neq(cls):
-    def _ne(self, dst):
-        return not self.__eq__(dst)
-    cls.__ne__ = _ne
-    return cls
+from util import *
 
 @neq
 @roprop('elms')
@@ -33,12 +22,12 @@ class grp_word_basis(object):
 
     @property
     def gen_elms(self):
-        return [self._elms[i] for i in range(0, len(self._elms), 2)]
+        return [self._elms[i] for i in xrange(0, len(self._elms), 2)]
 
     @property
     def inv_elms(self):
         assert len(self._elms) % 2 == 0
-        return [self._elms[i + 1] for i in range(0, len(self._elms), 2)]
+        return [self._elms[i + 1] for i in xrange(0, len(self._elms), 2)]
 
     def _ident_pres(self):
         return '<id>'
