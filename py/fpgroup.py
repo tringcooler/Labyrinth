@@ -54,6 +54,9 @@ class grp_word_basis(object):
     def __eq__(self, dst):
         return self.elms == dst.elms
 
+    def __contains__(self, dst):
+        return isinstance(dst, grp_word) and self == dst.basis
+
     def __add__(self, dst):
         if self == dst:
             return self
@@ -186,14 +189,52 @@ class fpgrp_element(grp_element):
     def __pow__(self, dst):
         pass
 
-class base_group(object):
-    pass
-
 @neq
+class base_fp_group(object):
+
+    @property
+    def gens(self):
+        return []
+
+    @property
+    def rels(self):
+        return []
+
+    def __eq__(self, dst):
+        return self.gens == dst.gens and self.rels == dst.rels
+
+    # subgroup
+    def __getitem__(self, gens):
+        if type(gens) == slice:
+            raise TypeError('slice unsupported')
+        elif type(gens) in [tuple, list]:
+            return subgroup_of_fpgrp(self, gens)
+        else:
+            return subgroup_of_fpgrp(self, [gens])
+
+    # quotient group
+    def __div__(self, ker):
+        pass
+
+@roprop('basis')
+class free_group(base_fp_group):
+
+    def __init__(self, basis):
+        if not isinstance(basis, grp_word_basis):
+            basis = grp_word_basis(basis)
+        self._basis = basis
+
+    @property
+    def gens(self):
+        return self.basis.gens()
+
+    def __contains__(self, dst):
+        return dst in self.basis
+
 @roprop('frgroup')
 @roprop('gens')
 @roprop('rels')
-class fp_group(base_group):
+class fp_group(base_fp_group):
 
     def __new__(cls, frgrp, rels):
         if not rels:
@@ -209,34 +250,22 @@ class fp_group(base_group):
                 raise ValueError("relator {0} is invalid".format(rel))
         self._rels = list(set(rels))
 
-    def __eq__(self, dst):
-        return (
-            self.frgroup == dst.frgroup ) and (
-            self.gens == dst.gens ) and (
-            self.rels == dst.rels )
-
-@neq
+@roprop('fpgroup')
 @roprop('gens')
-class free_group(base_group):
+class subgroup_of_fpgrp(base_fp_group):
 
-    def __init__(self, basis, gens = None):
-        if not isinstance(basis, grp_word_basis):
-            basis = grp_word_basis(basis)
+    def __new__(cls, fpgrp, gens):
         if not gens:
-            self._gens = basis.gens()
+            return fpgrp
         else:
-            self._gens = []
-            for gen in gens:
-                if not isinstance(gen, grp_word):
-                    gen = basis.gen(gen)
-                self._gens.append(gen)
-        self._gens = list(set(self._gens))
+            return super(subgroup_of_fpgrp, cls).__new__(cls)
 
-    def __eq__(self, dst):
-        return self.gens == dst.gens
-
-    def __contains__(self, dst):
-        pass
+    def __init__(self, fpgrp, gens):
+        self._fpgroup = fpgrp
+        for gen in gens:
+            if not gen in fpgrp:
+                raise ValueError("generator {0} is invalid".format(gen))
+        self._gens = list(set(gens))
 
 class valid_fp_group(fp_group):
 
