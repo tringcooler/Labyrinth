@@ -8,7 +8,7 @@ def roprop(prop):
 
 def neq(cls):
     def _ne(self, dst):
-        return not self.__eq__(dst)
+        return not self == dst
     cls.__ne__ = _ne
     return cls
 
