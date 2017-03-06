@@ -205,14 +205,12 @@ class fpgrp_element(object):
         self._group = grp
         self._word = word
         
-    @property
+    @lazyprop
     def state(self):
-        if not hasattr(self, '_state'):
-            try:
-                self._state = self._parse()
-            except AttributeError:
-                raise TypeError('only for fp-group and words')
-        return self._state
+        try:
+            return self._parse()
+        except AttributeError:
+            raise TypeError('only for fp-group and words')
 
     def _parse(self):
         print 'parse word'
@@ -298,11 +296,9 @@ class free_group(base_fp_group):
     def gens(self):
         return self.basis.gens()
 
-    @property
+    @lazyprop
     def one(self):
-        if not hasattr(self, '_one'):
-            self._one = self.basis.gen_num(0)
-        return self._one
+        return self.basis.gen_num(0)
 
     def has_element(self, dst):
         return dst in self.basis
@@ -346,23 +342,17 @@ class fp_group(base_fp_group):
     def basis(self):
         return self.frgroup.basis
 
-    @property
+    @lazyprop
     def gens(self):
-        if not hasattr(self, '_gens'):
-            self._gens = [fpgrp_element(self, g) for g in self.frgroup.gens]
-        return self._gens
+        return [fpgrp_element(self, g) for g in self.frgroup.gens]
 
-    @property
+    @lazyprop
     def one(self):
-        if not hasattr(self, '_one'):
-            self._one = fpgrp_element(self, self.frgroup.one)
-        return self._one
+        return fpgrp_element(self, self.frgroup.one)
 
-    @property
+    @lazyprop
     def trans(self):
-        if not hasattr(self, '_trans'):
-            self._trans = self.coset([])
-        return self._trans
+        return self.coset([])
 
     def coset(self, subs):
         print 'calc coset'
