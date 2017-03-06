@@ -12,6 +12,14 @@ def neq(cls):
     cls.__ne__ = _ne
     return cls
 
+def lazyprop(hndl):
+    nm = '_' + hndl.__name__
+    def _getter(self):
+        if not hasattr(self, nm):
+            setattr(self, nm, hndl(self))
+        return getattr(self, nm)
+    return property(_getter)
+
 @neq
 class vchain(object):
 
