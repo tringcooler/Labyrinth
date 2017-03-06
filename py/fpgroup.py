@@ -194,20 +194,58 @@ class grp_word(object):
     def __repr__(self):
         return "'" + self.__str__() + "'"
 
-class grp_element(object):
-    pass
-
-class fpgrp_element(grp_element):
+@neq
+@roprop('group')
+@roprop('word')
+class fpgrp_element(object):
 
     def __init__(self, grp, word):
-        self.group = grp
-        self.word = word
+        if not grp.basis == word.basis:
+            raise ValueError("invalid basis of '{0}'".format(word))
+        self._group = grp
+        self._word = word
+        
+    @property
+    def state(self):
+        if not hasattr(self, '_state'):
+            try:
+                self._state = self._parse()
+            except AttributeError:
+                raise TypeError('only for fp-group and words')
+        return self._state
+
+    def _parse(self):
+        print 'parse word'
+        sta = 0
+        trans = self.group.trans
+        for w in self.word.seq:
+            sta = trans[sta][w]
+        return sta
+
+    def __eq__(self, dst):
+        return self.group == dst.group and self.state == dst.state
 
     def __mul__(self, dst):
-        pass
+        if not self.group == dst.group:
+            raise ValueError('from different groups')
+        return type(self)(
+            self.group, self.word * dst.word)
 
     def __pow__(self, dst):
-        pass
+        if type(dst) in [int, long]:
+            return type(self)(
+                self.group, self.word ** dst)
+        elif self.group == dst.group:
+            return type(self)(
+                self.group, self.word ** dst.word)
+        else:
+            raise ValueError('from different groups')
+
+    def __str__(self):
+        return str(self.word)
+    
+    def __repr__(self):
+        return repr(self.word)
 
 @neq
 class base_fp_group(object):
@@ -253,15 +291,24 @@ class free_group(base_fp_group):
             basis = grp_word_basis(basis)
         self._basis = basis
 
+    def __len__(self):
+        return float('inf')
+
     @property
     def gens(self):
         return self.basis.gens()
 
-    def has_subgroup(self, dst):
-        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
+    @property
+    def one(self):
+        if not hasattr(self, '_one'):
+            self._one = self.basis.gen_num(0)
+        return self._one
 
     def has_element(self, dst):
         return dst in self.basis
+
+    def has_subgroup(self, dst):
+        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
 
     def quogroup(self, ker):
         if type(ker) in [tuple, list]:
@@ -273,7 +320,6 @@ class free_group(base_fp_group):
             raise TypeError('quotient invalid')
 
 @roprop('frgroup')
-@roprop('gens')
 @roprop('rels')
 class fp_group(base_fp_group):
 
@@ -285,15 +331,32 @@ class fp_group(base_fp_group):
 
     def __init__(self, frgrp, rels):
         self._frgroup = frgrp
-        self._gens = [fpgrp_element(self, g) for g in frgrp.gens]
         for rel in rels:
             if not rel in frgrp:
                 raise ValueError("relator {0} is invalid".format(rel))
         self._rels = list(set(rels))
 
+    def __len__(self):
+        return len(self.trans)
+
     def has_element(self, dst):
-        pass
-        #TODO
+        return self == dst.group
+
+    @property
+    def basis(self):
+        return self.frgroup.basis
+
+    @property
+    def gens(self):
+        if not hasattr(self, '_gens'):
+            self._gens = [fpgrp_element(self, g) for g in self.frgroup.gens]
+        return self._gens
+
+    @property
+    def one(self):
+        if not hasattr(self, '_one'):
+            self._one = fpgrp_element(self, self.frgroup.one)
+        return self._one
 
     @property
     def trans(self):
@@ -302,8 +365,9 @@ class fp_group(base_fp_group):
         return self._trans
 
     def coset(self, subs):
+        print 'calc coset'
         coset_tbl = coset_table(
-            len(self.gens),
+            len(self.basis),
             [rel.num_resp() for rel in self.rels],
             [sub.num_resp() for sub in subs])
         try:
@@ -315,10 +379,10 @@ class fp_group(base_fp_group):
             tbl, tbli = coset_tbl.gentbl.states[i].tbl
             tra = {}
             for g in xrange(len(tbl)):
-                gen = self.frgroup.basis.gen_num(g + 1)
+                gen = str(self.basis.gen_num(g + 1))
                 tra[gen] = tbl[g].id
             for g in xrange(len(tbli)):
-                gen = self.frgroup.basis.gen_num(- g - 1)
+                gen = str(self.basis.gen_num(- g - 1))
                 tra[gen] = tbli[g].id
             coset.append(tra)
         return coset
