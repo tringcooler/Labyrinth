@@ -2,6 +2,7 @@
 import re
 
 from util import *
+from todd_coxeter import coset_table
 
 @neq
 @roprop('elms')
@@ -42,14 +43,19 @@ class grp_word_basis(object):
         return len(n) > 4 and n[-4:] == '**-1'
 
     def position(self, n):
-        return self.elms.index(n)
+        idx = self.elms.index(n)
+        pos = (idx // 2) + 1
+        if idx % 2:
+            pos = - pos
+        return pos
 
     def invers(self, n):
+        if not n in self.elms:
+            raise ValueError('element {0} invalid'.format(n))
         if self.is_invers(n):
-            r = self.position(self._invers_invers_pres(n))
+            return self._invers_invers_pres(n)
         else:
-            r = self.position(self._invers_pres(n))
-        return self.elms[r]
+            return self._invers_pres(n)
 
     def __eq__(self, dst):
         return self.elms == dst.elms
@@ -68,14 +74,23 @@ class grp_word_basis(object):
         assert len(self._elms) % 2 == 0
         return len(self._elms) / 2
 
+    def gen_num(self, n):
+        if n == 0:
+            return grp_word([], self)
+        else:
+            pos = (abs(n) - 1) * 2
+            if n < 0:
+                pos += 1
+            if pos >= len(self.elms):
+                raise ValueError('element num {0} invalid'.format(n))
+            return grp_word([self.elms[pos]], self)
+
     def gen(self, n):
         if n == self._ident_pres():
             return grp_word([], self)
         else:
-            try:
-                self.position(n)
-            except:
-                raise
+            if not n in self.elms:
+                raise ValueError('element {0} invalid'.format(n))
             return grp_word([n], self)
 
     def gens(self, inv = False):
@@ -125,6 +140,9 @@ class grp_word(object):
         _upd()
         return wr, cr
 
+    def num_resp(self):
+        return [self.basis.position(w) for w in self.seq]
+
     def mapped(self, gens):
         if len(gens) < len(self.basis):
             raise ValueError(
@@ -161,6 +179,8 @@ class grp_word(object):
             return dst ** -1 * self * dst
 
     def __str__(self):
+        if not self.seq:
+            return self.basis.id_elm
         er = self.exp_resp()
         r = []
         for w, c in zip(*er):
@@ -200,21 +220,30 @@ class base_fp_group(object):
     def rels(self):
         return []
 
+    def subgroup(self, gens):
+        return subgroup_of_fpgrp(self, gens)
+
+    def quogroup(self, ker):
+        raise TypeError('quotient invalid')
+
     def __eq__(self, dst):
         return self.gens == dst.gens and self.rels == dst.rels
+
+    def __contains__(self, dst):
+        return self.has_element(dst)
 
     # subgroup
     def __getitem__(self, gens):
         if type(gens) == slice:
             raise TypeError('slice unsupported')
         elif type(gens) in [tuple, list]:
-            return subgroup_of_fpgrp(self, gens)
+            return self.subgroup(gens)
         else:
-            return subgroup_of_fpgrp(self, [gens])
+            return self.subgroup([gens])
 
     # quotient group
     def __div__(self, ker):
-        pass
+        return self.quogroup(ker)
 
 @roprop('basis')
 class free_group(base_fp_group):
@@ -228,8 +257,20 @@ class free_group(base_fp_group):
     def gens(self):
         return self.basis.gens()
 
-    def __contains__(self, dst):
+    def has_subgroup(self, dst):
+        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
+
+    def has_element(self, dst):
         return dst in self.basis
+
+    def quogroup(self, ker):
+        if type(ker) in [tuple, list]:
+            return fp_group(self, ker)
+        elif self.has_subgroup(ker):
+            rels = ker.gens
+            return fp_group(self, rels)
+        else:
+            raise TypeError('quotient invalid')
 
 @roprop('frgroup')
 @roprop('gens')
@@ -249,6 +290,38 @@ class fp_group(base_fp_group):
             if not rel in frgrp:
                 raise ValueError("relator {0} is invalid".format(rel))
         self._rels = list(set(rels))
+
+    def has_element(self, dst):
+        pass
+        #TODO
+
+    @property
+    def trans(self):
+        if not hasattr(self, '_trans'):
+            self._trans = self.coset([])
+        return self._trans
+
+    def coset(self, subs):
+        coset_tbl = coset_table(
+            len(self.gens),
+            [rel.num_resp() for rel in self.rels],
+            [sub.num_resp() for sub in subs])
+        try:
+            coset_tbl.run()
+        except coset_tbl.noresult:
+            return None
+        coset = []
+        for i in xrange(coset_tbl.gentbl.statid):
+            tbl, tbli = coset_tbl.gentbl.states[i].tbl
+            tra = {}
+            for g in xrange(len(tbl)):
+                gen = self.frgroup.basis.gen_num(g + 1)
+                tra[gen] = tbl[g].id
+            for g in xrange(len(tbli)):
+                gen = self.frgroup.basis.gen_num(- g - 1)
+                tra[gen] = tbli[g].id
+            coset.append(tra)
+        return coset
 
 @roprop('fpgroup')
 @roprop('gens')
