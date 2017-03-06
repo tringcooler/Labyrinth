@@ -24,7 +24,7 @@ class gen_table(object):
 
     def trans(self, sta, gen, chk = True):
         if gen == 0:
-            raise ValueError('gen is based on 1')
+            return sta
         elif gen > 0:
             gen = gen - 1
             tra = 0
@@ -40,7 +40,9 @@ class gen_table(object):
             return
         #print 'rec', sta.id, gen, rsta.id
         if gen == 0:
-            raise ValueError('gen is based on 1')
+            if not sta == rsta:
+                self.confluent(sta, rsta)
+            return
         elif gen > 0:
             gen = gen - 1
             ssta = sta
