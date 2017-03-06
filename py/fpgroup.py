@@ -204,6 +204,10 @@ class fpgrp_element(object):
             raise ValueError("invalid basis of '{0}'".format(word))
         self._group = grp
         self._word = word
+
+    @property
+    def seq(self):
+        return self.word.seq
         
     @lazyprop
     def state(self):
@@ -213,10 +217,10 @@ class fpgrp_element(object):
             raise TypeError('only for fp-group and words')
 
     def _parse(self):
-        print 'parse word'
+        #print 'parse word'
         sta = 0
         trans = self.group.trans
-        for w in self.word.seq:
+        for w in self.seq:
             sta = trans[sta][w]
         return sta
 
@@ -261,6 +265,29 @@ class base_fp_group(object):
 
     def quogroup(self, ker):
         raise TypeError('quotient invalid')
+
+    def coset(self, rels, subs):
+        #print 'calc coset'
+        coset_tbl = coset_table(
+            len(self.basis),
+            [rel.num_resp() for rel in rels],
+            [sub.num_resp() for sub in subs])
+        try:
+            coset_tbl.run()
+        except coset_tbl.noresult:
+            raise RuntimeError('coset unstoppable')
+        coset = []
+        for i in xrange(coset_tbl.gentbl.statid):
+            tbl, tbli = coset_tbl.gentbl.states[i].tbl
+            tra = {}
+            for g in xrange(len(tbl)):
+                gen = str(self.basis.gen_num(g + 1))
+                tra[gen] = tbl[g].id
+            for g in xrange(len(tbli)):
+                gen = str(self.basis.gen_num(- g - 1))
+                tra[gen] = tbli[g].id
+            coset.append(tra)
+        return coset
 
     def __eq__(self, dst):
         return self.gens == dst.gens and self.rels == dst.rels
@@ -330,10 +357,18 @@ class fp_group(base_fp_group):
         for rel in rels:
             if not rel in frgrp:
                 raise ValueError("relator {0} is invalid".format(rel))
+        #TODO sort not determined
+        #['b**2', 'a*b', 'a**2'] <-set-> ['b**2', 'a**2', 'a*b']
+        print rels, list(set(rels))
         self._rels = list(set(rels))
 
     def __len__(self):
         return len(self.trans)
+
+    def __eq__(self, dst):
+        #TODO gens eq check looped
+        #TODO eq with other group
+        return self.frgroup == dst.frgroup and self.rels == dst.rels
 
     def has_element(self, dst):
         return self == dst.group
@@ -352,30 +387,7 @@ class fp_group(base_fp_group):
 
     @lazyprop
     def trans(self):
-        return self.coset([])
-
-    def coset(self, subs):
-        print 'calc coset'
-        coset_tbl = coset_table(
-            len(self.basis),
-            [rel.num_resp() for rel in self.rels],
-            [sub.num_resp() for sub in subs])
-        try:
-            coset_tbl.run()
-        except coset_tbl.noresult:
-            return None
-        coset = []
-        for i in xrange(coset_tbl.gentbl.statid):
-            tbl, tbli = coset_tbl.gentbl.states[i].tbl
-            tra = {}
-            for g in xrange(len(tbl)):
-                gen = str(self.basis.gen_num(g + 1))
-                tra[gen] = tbl[g].id
-            for g in xrange(len(tbli)):
-                gen = str(self.basis.gen_num(- g - 1))
-                tra[gen] = tbli[g].id
-            coset.append(tra)
-        return coset
+        return self.coset(self.rels, [])
 
 @roprop('fpgroup')
 @roprop('gens')
@@ -393,6 +405,32 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in fpgrp:
                 raise ValueError("generator {0} is invalid".format(gen))
         self._gens = list(set(gens))
+
+    @property
+    def basis(self):
+        return self.fpgroup.basis
+
+    @property
+    def one(self):
+        return self.fpgroup.one
+
+    @lazyprop
+    def filt(self):
+        return self.coset(self.gens, [])
+
+    def _in_filter(self, dst):
+        sta = 0
+        trans = self.filt
+        for w in dst.seq:
+            sta = trans[sta][w]
+        return sta == 0
+
+    def has_element(self, dst):
+        return dst in self.fpgroup and self._in_filter(dst)
+
+    def subgroup(self, gens):
+        return type(self)(
+            self.fpgroup, self.gens + list(gens))
 
 class valid_fp_group(fp_group):
 
