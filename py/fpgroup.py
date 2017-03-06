@@ -10,11 +10,12 @@ class grp_word_basis(object):
 
     def __init__(self, names):
         elms = []
-        for n in set(names):
+        for n in sorted(names):
             if type(n) in [int, long]:
                 raise TypeError("name shouldn't be int")
-            elms.append(n)
-            elms.append(self._invers_pres(n))
+            if not n in elms:
+                elms.append(n)
+                elms.append(self._invers_pres(n))
         self._elms = elms
 
     @property
@@ -253,7 +254,7 @@ class fpgrp_element(object):
 class base_fp_group(object):
 
     @property
-    def gens(self):
+    def genwds(self):
         return []
 
     @property
@@ -290,7 +291,7 @@ class base_fp_group(object):
         return coset
 
     def __eq__(self, dst):
-        return self.gens == dst.gens and self.rels == dst.rels
+        return self.genwds == dst.genwds and self.rels == dst.rels
 
     def __contains__(self, dst):
         return self.has_element(dst)
@@ -337,7 +338,7 @@ class free_group(base_fp_group):
         if type(ker) in [tuple, list]:
             return fp_group(self, ker)
         elif self.has_subgroup(ker):
-            rels = ker.gens
+            rels = ker.genwds
             return fp_group(self, rels)
         else:
             raise TypeError('quotient invalid')
@@ -354,21 +355,21 @@ class fp_group(base_fp_group):
 
     def __init__(self, frgrp, rels):
         self._frgroup = frgrp
+        self._rels = []
         for rel in rels:
             if not rel in frgrp:
                 raise ValueError("relator {0} is invalid".format(rel))
-        #TODO sort not determined
-        #['b**2', 'a*b', 'a**2'] <-set-> ['b**2', 'a**2', 'a*b']
-        print rels, list(set(rels))
-        self._rels = list(set(rels))
+            if not rel in self.rels:
+                self.rels.append(rel)
+        self.rels.sort(key = lambda w: w.seq)
 
     def __len__(self):
         return len(self.trans)
 
-    def __eq__(self, dst):
+    #def __eq__(self, dst):
         #TODO gens eq check looped
         #TODO eq with other group
-        return self.frgroup == dst.frgroup and self.rels == dst.rels
+    #    return self.frgroup == dst.frgroup and self.rels == dst.rels
 
     def has_element(self, dst):
         return self == dst.group
@@ -401,14 +402,21 @@ class subgroup_of_fpgrp(base_fp_group):
 
     def __init__(self, fpgrp, gens):
         self._fpgroup = fpgrp
+        self._gens = []
         for gen in gens:
             if not gen in fpgrp:
                 raise ValueError("generator {0} is invalid".format(gen))
-        self._gens = list(set(gens))
+            if not gen in self.gens:
+                self.gens.append(gen)
+        self.gens.sort(key = lambda w: w.seq)
 
     @property
     def basis(self):
         return self.fpgroup.basis
+
+    @property
+    def genwds(self):
+        return self.gens
 
     @property
     def one(self):
@@ -416,7 +424,7 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def filt(self):
-        return self.coset(self.gens, [])
+        return self.coset(self.genwds, [])
 
     def _in_filter(self, dst):
         sta = 0
