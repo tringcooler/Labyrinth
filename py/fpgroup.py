@@ -117,6 +117,9 @@ class grp_word(object):
         self._basis = basis
         self._seq = wl
 
+    def __len__(self):
+        return len(self.seq)
+
     def exp_resp(self):
         wr = []
         cr = []
@@ -213,17 +216,9 @@ class fpgrp_element(object):
     @lazyprop
     def state(self):
         try:
-            return self._parse()
+            return self.group.trans.state(self)
         except AttributeError:
             raise TypeError('only for fp-group and words')
-
-    def _parse(self):
-        #print 'parse word'
-        sta = 0
-        trans = self.group.trans
-        for w in self.seq:
-            sta = trans[sta][w]
-        return sta
 
     def __eq__(self, dst):
         return self.group == dst.group and self.state == dst.state
@@ -251,23 +246,29 @@ class fpgrp_element(object):
         return repr(self.word)
 
 @neq
-class base_fp_group(object):
+@roprop('basis')
+@roprop('rels')
+@roprop('subs')
+@roprop('tbl')
+@roprop('finished')
+class grp_coset(object):
 
-    @property
-    def genwds(self):
-        return []
+    def __init__(self, basis, rels, subs = None):
+        if subs == None:
+            subs = []
+        self._basis = basis
+        self._rels = rels
+        self._subs = subs
+        self._calc(rels, subs)
 
-    @property
-    def rels(self):
-        return []
+    def __len__(self):
+        if self.finished:
+            return len(self.tbl)
+        else:
+            #return float('inf')
+            raise OverflowError('infinity length')
 
-    def subgroup(self, gens):
-        return subgroup_of_fpgrp(self, gens)
-
-    def quogroup(self, ker):
-        raise TypeError('quotient invalid')
-
-    def coset(self, rels, subs):
+    def _calc(self, rels, subs):
         #print 'calc coset'
         coset_tbl = coset_table(
             len(self.basis),
@@ -275,23 +276,82 @@ class base_fp_group(object):
             [sub.num_resp() for sub in subs])
         try:
             coset_tbl.run()
-        except coset_tbl.noresult:
-            raise RuntimeError('coset unstoppable')
-        coset = []
+        except coset_tbl.noresult as ex:
+            self._finished = False
+        else:
+            self._finished = True
+        self._tbl = []
         for i in xrange(coset_tbl.gentbl.statid):
             tbl, tbli = coset_tbl.gentbl.states[i].tbl
             tra = {}
             for g in xrange(len(tbl)):
-                gen = str(self.basis.gen_num(g + 1))
-                tra[gen] = tbl[g].id
+                #gen = str(self.basis.gen_num(g + 1))
+                gen = self.basis.gen_num(g + 1).seq[0]
+                if tbl[g] == None:
+                    tra[gen] = None
+                else:
+                    tra[gen] = tbl[g].id
             for g in xrange(len(tbli)):
-                gen = str(self.basis.gen_num(- g - 1))
-                tra[gen] = tbli[g].id
-            coset.append(tra)
-        return coset
+                #gen = str(self.basis.gen_num(- g - 1))
+                gen = self.basis.gen_num(- g - 1).seq[0]
+                if tbli[g] == None:
+                    tra[gen] = None
+                else:
+                    tra[gen] = tbli[g].id
+            self.tbl.append(tra)
+
+    def state(self, word, st = 0):
+        #print 'parse word'
+        sta = st
+        for w in word.seq:
+            sta = self.tbl[sta][w]
+        return sta
+
+    def __contains__(self, dst):
+        if not (isinstance(dst, grp_coset) and (
+            self.basis == dst.basis and dst.finished)):
+            return False
+        if len(dst) < 2:
+            return True
+        for rel in self.rels:
+            if not dst.state(rel, 1) == 1:
+                return False
+        for sub in self.subs:
+            if not dst.state(sub, 0) == 0:
+                return False
+        return True
 
     def __eq__(self, dst):
-        return self.genwds == dst.genwds and self.rels == dst.rels
+        return self in dst and dst in self
+
+@neq
+class base_fp_group(object):
+
+    @property
+    def rels(self):
+        return []
+
+    @property
+    def trans(self):
+        return None
+
+    @property
+    def filt(self):
+        return None
+
+    def subgroup(self, gens):
+        return subgroup_of_fpgrp(self, gens)
+
+    def quogroup(self, ker):
+        raise TypeError('quotient invalid')
+
+    def __eq__(self, dst):
+        if not isinstance(dst, base_fp_group):
+            return False
+        elif not (self.trans or self.filt or dst.trans or dst.filt):
+            return self.basis == dst.basis
+        else:
+            return self.trans == dst.trans and self.filt == dst.filt
 
     def __contains__(self, dst):
         return self.has_element(dst)
@@ -318,7 +378,8 @@ class free_group(base_fp_group):
         self._basis = basis
 
     def __len__(self):
-        return float('inf')
+        #return float('inf')
+        raise OverflowError('infinity length')
 
     @property
     def gens(self):
@@ -366,11 +427,6 @@ class fp_group(base_fp_group):
     def __len__(self):
         return len(self.trans)
 
-    #def __eq__(self, dst):
-        #TODO gens eq check looped
-        #TODO eq with other group
-    #    return self.frgroup == dst.frgroup and self.rels == dst.rels
-
     def has_element(self, dst):
         return self == dst.group
 
@@ -388,10 +444,11 @@ class fp_group(base_fp_group):
 
     @lazyprop
     def trans(self):
-        return self.coset(self.rels, [])
+        return grp_coset(self.basis, self.rels)
 
 @roprop('fpgroup')
 @roprop('gens')
+@roprop('genwds')
 class subgroup_of_fpgrp(base_fp_group):
 
     def __new__(cls, fpgrp, gens):
@@ -409,6 +466,7 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in self.gens:
                 self.gens.append(gen)
         self.gens.sort(key = lambda w: w.seq)
+        self._genwds = [g.word for g in self.gens]
 
     @property
     def basis(self):
@@ -424,17 +482,11 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def filt(self):
-        return self.coset(self.genwds, [])
-
-    def _in_filter(self, dst):
-        sta = 0
-        trans = self.filt
-        for w in dst.seq:
-            sta = trans[sta][w]
-        return sta == 0
+        return grp_coset(self.basis, self.genwds)
 
     def has_element(self, dst):
-        return dst in self.fpgroup and self._in_filter(dst)
+        return dst in self.fpgroup and (
+            self.filt.state(dst) == 0)
 
     def subgroup(self, gens):
         return type(self)(
