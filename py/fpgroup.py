@@ -58,6 +58,7 @@ class grp_word_basis(object):
         else:
             return self._invers_pres(n)
 
+    @iseq
     def __eq__(self, dst):
         return self.elms == dst.elms
 
@@ -162,6 +163,7 @@ class grp_word(object):
                 rslt *= word
         return rslt
 
+    @iseq
     def __eq__(self, dst):
         return self.basis == dst.basis and self.seq == dst.seq
 
@@ -220,6 +222,7 @@ class fpgrp_element(object):
         except AttributeError:
             raise TypeError('only for fp-group and words')
 
+    @iseq
     def __eq__(self, dst):
         return self.group == dst.group and self.state == dst.state
 
@@ -321,6 +324,7 @@ class grp_coset(object):
                 return False
         return True
 
+    @iseq
     def __eq__(self, dst):
         return self in dst and dst in self
 
@@ -345,6 +349,7 @@ class base_fp_group(object):
     def quogroup(self, ker):
         raise TypeError('quotient invalid')
 
+    @iseq
     def __eq__(self, dst):
         if not isinstance(dst, base_fp_group):
             return False
