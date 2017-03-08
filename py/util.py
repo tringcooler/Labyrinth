@@ -20,6 +20,14 @@ def lazyprop(hndl):
         return getattr(self, nm)
     return property(_getter)
 
+def iseq(hndl):
+    def _eq(self, dst):
+        if self is dst:
+            return True
+        else:
+            return hndl(self, dst)
+    return _eq
+
 @neq
 class vchain(object):
 
