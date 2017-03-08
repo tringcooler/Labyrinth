@@ -283,6 +283,9 @@ class grp_coset(object):
             self._finished = False
         else:
             self._finished = True
+        #TODO
+        #coset calc may stop with some None states in tbl
+        #when some gens wasn't appeared in rels or subs
         self._tbl = []
         for i in xrange(coset_tbl.gentbl.statid):
             tbl, tbli = coset_tbl.gentbl.states[i].tbl
@@ -326,6 +329,8 @@ class grp_coset(object):
 
     @iseq
     def __eq__(self, dst):
+        if not isinstance(dst, grp_coset):
+            return False
         return self in dst and dst in self
 
 @neq
@@ -472,6 +477,18 @@ class subgroup_of_fpgrp(base_fp_group):
                 self.gens.append(gen)
         self.gens.sort(key = lambda w: w.seq)
         self._genwds = [g.word for g in self.gens]
+
+    def __len__(self):
+        #TODO it's wrong here
+        #foo = f2/[a**2, b**3, (a*b)**4]
+        #bar = foo[fa**2, fb]
+        #len(bar) incorrect
+        #bar2 = foo[fb]
+        #foo.1**2 in bar2 raised a error
+        wlen = len(self.fpgroup)
+        findex = len(self.filt)
+        assert wlen % findex == 0
+        return wlen / findex
 
     @property
     def basis(self):
