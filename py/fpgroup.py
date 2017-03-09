@@ -283,9 +283,6 @@ class grp_coset(object):
             self._finished = False
         else:
             self._finished = True
-        #TODO
-        #coset calc may stop with some None states in tbl
-        #when some gens wasn't appeared in rels or subs
         self._tbl = []
         for i in xrange(coset_tbl.gentbl.statid):
             tbl, tbli = coset_tbl.gentbl.states[i].tbl
@@ -476,9 +473,16 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in self.gens:
                 self.gens.append(gen)
         self.gens.sort(key = lambda w: w.seq)
-        self._genwds = [g.word for g in self.gens]
+        if isinstance(fpgrp, fp_group):
+            self._genwds = [g.word for g in self.gens]
+        else:
+            self._genwds = self.gens
 
     def __len__(self):
+        return self._length
+
+    @lazyprop
+    def _length(self):
         #TODO it's wrong here
         #foo = f2/[a**2, b**3, (a*b)**4]
         #bar = foo[fa**2, fb]
@@ -495,8 +499,8 @@ class subgroup_of_fpgrp(base_fp_group):
         return self.fpgroup.basis
 
     @property
-    def genwds(self):
-        return self.gens
+    def rels(self):
+        return self.fpgroup.rels
 
     @property
     def one(self):
@@ -504,7 +508,7 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def filt(self):
-        return grp_coset(self.basis, self.genwds)
+        return grp_coset(self.basis, self.rels + self.genwds)
 
     def has_element(self, dst):
         return dst in self.fpgroup and (
