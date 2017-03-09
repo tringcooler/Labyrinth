@@ -272,6 +272,8 @@ class grp_coset(object):
             raise OverflowError('infinity length')
 
     def _calc(self, rels, subs):
+        #TODO
+        #DO NOT ALLOW free rels or subs as a id word
         #print 'calc coset'
         coset_tbl = coset_table(
             len(self.basis),
@@ -435,7 +437,7 @@ class fp_group(base_fp_group):
         return len(self.trans)
 
     def has_element(self, dst):
-        return self == dst.group
+        return isinstance(dst, fpgrp_element) and self == dst.group
 
     @property
     def basis(self):
