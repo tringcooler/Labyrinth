@@ -60,7 +60,7 @@ class grp_word_basis(object):
 
     @iseq
     def __eq__(self, dst):
-        return self.elms == dst.elms
+        return isinstance(dst, grp_word_basis) and self.elms == dst.elms
 
     def __contains__(self, dst):
         return isinstance(dst, grp_word) and self == dst.basis
@@ -165,7 +165,8 @@ class grp_word(object):
 
     @iseq
     def __eq__(self, dst):
-        return self.basis == dst.basis and self.seq == dst.seq
+        return isinstance(dst, grp_word) and (
+            self.basis == dst.basis and self.seq == dst.seq)
 
     def __mul__(self, dst):
         return type(self)(self.seq + dst.seq, self.basis + dst.basis)
@@ -224,7 +225,8 @@ class fpgrp_element(object):
 
     @iseq
     def __eq__(self, dst):
-        return self.group == dst.group and self.state == dst.state
+        return isinstance(dst, fpgrp_element) and (
+            self.group == dst.group and self.state == dst.state)
 
     def __mul__(self, dst):
         if not self.group == dst.group:
@@ -272,8 +274,6 @@ class grp_coset(object):
             raise OverflowError('infinity length')
 
     def _calc(self, rels, subs):
-        #TODO
-        #DO NOT ALLOW free rels or subs as a id word
         #print 'calc coset'
         coset_tbl = coset_table(
             len(self.basis),
@@ -310,7 +310,23 @@ class grp_coset(object):
         sta = st
         for w in word.seq:
             sta = self.tbl[sta][w]
+            if sta == None:
+                return None
         return sta
+
+    def trav_word(self, word, sta = None, result = None):
+        if result == None:
+            result = [None] * len(self)
+        if sta == None:
+            sta = self.state(word)
+        trans = self.tbl[sta]
+        for w in trans:
+            nsta = trans[w]
+            nwd = word * word.basis.gen(w)
+            if result[nsta] == None:
+                result[nsta] = nwd
+                self.trav_word(nwd, nsta, result)
+        return result
 
     def __contains__(self, dst):
         if not (isinstance(dst, grp_coset) and (
@@ -328,9 +344,7 @@ class grp_coset(object):
 
     @iseq
     def __eq__(self, dst):
-        if not isinstance(dst, grp_coset):
-            return False
-        return self in dst and dst in self
+        return isinstance(dst, grp_coset) and self in dst and dst in self
 
 @neq
 class base_fp_group(object):
@@ -346,6 +360,10 @@ class base_fp_group(object):
     @property
     def filt(self):
         return None
+
+    @property
+    def elems(self):
+        raise TypeError('infinity group')
 
     def subgroup(self, gens):
         return subgroup_of_fpgrp(self, gens)
@@ -436,6 +454,13 @@ class fp_group(base_fp_group):
     def __len__(self):
         return len(self.trans)
 
+    @lazyprop
+    def elems(self):
+        if not self.trans.finished:
+            raise TypeError('unfinished fp-group')
+        return [fpgrp_element(
+            self, w) for w in self.trans.trav_word(self.one.word)]
+
     def has_element(self, dst):
         return isinstance(dst, fpgrp_element) and self == dst.group
 
@@ -496,6 +521,10 @@ class subgroup_of_fpgrp(base_fp_group):
         assert wlen % findex == 0
         return wlen / findex
 
+    @lazyprop
+    def elems(self):
+        return [e for e in self.fpgroup.elems if e in self]
+
     @property
     def basis(self):
         return self.fpgroup.basis
@@ -510,7 +539,8 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def filt(self):
-        return grp_coset(self.basis, self.rels + self.genwds)
+        #return grp_coset(self.basis, self.rels + self.genwds)
+        return grp_coset(self.basis, self.genwds)
 
     def has_element(self, dst):
         return dst in self.fpgroup and (
