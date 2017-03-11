@@ -506,20 +506,14 @@ class subgroup_of_fpgrp(base_fp_group):
             self._genwds = self.gens
 
     def __len__(self):
-        return self._length
-
-    @lazyprop
-    def _length(self):
-        #TODO it's wrong here
-        #foo = f2/[a**2, b**3, (a*b)**4]
-        #bar = foo[fa**2, fb]
-        #len(bar) incorrect
-        #bar2 = foo[fb]
-        #foo.1**2 in bar2 raised a error
         wlen = len(self.fpgroup)
-        findex = len(self.filt)
-        assert wlen % findex == 0
-        return wlen / findex
+        index = self.index
+        assert wlen % index == 0
+        return wlen / index
+
+    @property
+    def index(self):
+        return len(self.filt)
 
     @lazyprop
     def elems(self):
@@ -539,8 +533,7 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def filt(self):
-        #return grp_coset(self.basis, self.rels + self.genwds)
-        return grp_coset(self.basis, self.genwds)
+        return grp_coset(self.basis, self.rels, self.genwds)
 
     def has_element(self, dst):
         return dst in self.fpgroup and (
