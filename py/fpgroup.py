@@ -255,6 +255,7 @@ class fpgrp_element(object):
 @roprop('rels')
 @roprop('subs')
 @roprop('tbl')
+@roprop('stopped')
 @roprop('finished')
 class grp_coset(object):
 
@@ -282,10 +283,11 @@ class grp_coset(object):
         try:
             coset_tbl.run()
         except coset_tbl.noresult as ex:
-            self._finished = False
+            self._stopped = False
         else:
-            self._finished = True
+            self._stopped = True
         self._tbl = []
+        self._finished = True
         for i in xrange(coset_tbl.gentbl.statid):
             tbl, tbli = coset_tbl.gentbl.states[i].tbl
             tra = {}
@@ -293,6 +295,8 @@ class grp_coset(object):
                 #gen = str(self.basis.gen_num(g + 1))
                 gen = self.basis.gen_num(g + 1).seq[0]
                 if tbl[g] == None:
+                    if self.finished:
+                        self._finished = False
                     tra[gen] = None
                 else:
                     tra[gen] = tbl[g].id
@@ -300,6 +304,8 @@ class grp_coset(object):
                 #gen = str(self.basis.gen_num(- g - 1))
                 gen = self.basis.gen_num(- g - 1).seq[0]
                 if tbli[g] == None:
+                    if self.finished:
+                        self._finished = False
                     tra[gen] = None
                 else:
                     tra[gen] = tbli[g].id
@@ -346,20 +352,15 @@ class grp_coset(object):
     def __eq__(self, dst):
         return isinstance(dst, grp_coset) and self in dst and dst in self
 
+    def __nonzero__(self):
+        return True
+
 @neq
 class base_fp_group(object):
 
     @property
     def rels(self):
         return []
-
-    @property
-    def trans(self):
-        return None
-
-    @property
-    def filt(self):
-        return None
 
     @property
     def elems(self):
@@ -415,6 +416,14 @@ class free_group(base_fp_group):
     @lazyprop
     def one(self):
         return self.basis.gen_num(0)
+
+    @property
+    def trans(self):
+        return None
+
+    @property
+    def filt(self):
+        return None
 
     def has_element(self, dst):
         return dst in self.basis
@@ -480,6 +489,10 @@ class fp_group(base_fp_group):
     def trans(self):
         return grp_coset(self.basis, self.rels)
 
+    @lazyprop
+    def filt(self):
+        return grp_coset(self.basis, self.frgroup.gens)
+
 @roprop('fpgroup')
 @roprop('gens')
 @roprop('genwds')
@@ -530,6 +543,10 @@ class subgroup_of_fpgrp(base_fp_group):
     @property
     def one(self):
         return self.fpgroup.one
+
+    @property
+    def trans(self):
+        return self.fpgroup.trans
 
     @lazyprop
     def filt(self):
