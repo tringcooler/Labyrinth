@@ -336,13 +336,16 @@ class grp_coset(object):
         return result
 
     def __contains__(self, dst):
-        if not (isinstance(dst, grp_coset) and (
-            self.basis == dst.basis and dst.finished)):
+        if not (isinstance(dst, grp_coset) and self.basis == dst.basis):
             return False
-        if len(dst) < 2:
-            return True
+        rcs = 1
+        if len(dst.tbl) < 2:
+            if dst.finished:
+                return True
+            else:
+                rcs = 0
         for rel in self.rels:
-            if not dst.state(rel, 1) == 1:
+            if not dst.state(rel, rcs) == rcs:
                 return False
         for sub in self.subs:
             if not dst.state(sub, 0) == 0:
@@ -558,12 +561,10 @@ class subgroup_of_fpgrp(base_fp_group):
             self.filt.state(dst) == 0)
 
     def subgroup(self, gens):
-        return self.fpgroup.subgroup(self.gens + gens)
-        #return subgroup_of_fpgrp(
-        #    self.fpgroup, self.gens + list(gens))
-        #TODO
-        #a*b not in f2[a**2, b**2]
-        #but f2[a**2, b**2][a*b] == f2[a**2, b**2, a*b]
+        for gen in gens:
+            if not gen in self:
+                raise ValueError("generator {0} is invalid".format(gen))
+        return self.fpgroup.subgroup(gens)
 
 class normalclosure_of_subgrp(subgroup_of_fpgrp):
 
