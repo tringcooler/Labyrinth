@@ -321,10 +321,11 @@ class grp_coset(object):
         return sta
 
     def trav_word(self, word, sta = None, result = None):
-        if result == None:
-            result = [None] * len(self)
         if sta == None:
             sta = self.state(word)
+        if result == None:
+            result = [None] * len(self)
+            result[sta] = word
         trans = self.tbl[sta]
         for w in trans:
             nsta = trans[w]
@@ -361,10 +362,6 @@ class base_fp_group(object):
     @property
     def rels(self):
         return []
-
-    @property
-    def elems(self):
-        raise TypeError('infinity group')
 
     def subgroup(self, gens):
         return subgroup_of_fpgrp(self, gens)
@@ -416,6 +413,10 @@ class free_group(base_fp_group):
     @lazyprop
     def one(self):
         return self.basis.gen_num(0)
+
+    @property
+    def elems(self):
+        raise OverflowError('infinity group')
 
     @property
     def trans(self):
@@ -559,10 +560,5 @@ class subgroup_of_fpgrp(base_fp_group):
     def subgroup(self, gens):
         return type(self)(
             self.fpgroup, self.gens + list(gens))
-
-class valid_fp_group(fp_group):
-
-    def __init__(self):
-        pass
 
 
