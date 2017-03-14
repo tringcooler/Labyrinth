@@ -558,7 +558,16 @@ class subgroup_of_fpgrp(base_fp_group):
             self.filt.state(dst) == 0)
 
     def subgroup(self, gens):
-        return type(self)(
-            self.fpgroup, self.gens + list(gens))
+        return self.fpgroup.subgroup(self.gens + gens)
+        #return subgroup_of_fpgrp(
+        #    self.fpgroup, self.gens + list(gens))
+        #TODO
+        #a*b not in f2[a**2, b**2]
+        #but f2[a**2, b**2][a*b] == f2[a**2, b**2, a*b]
 
+class normalclosure_of_subgrp(subgroup_of_fpgrp):
+
+    @lazyprop
+    def filt(self):
+        return grp_coset(self.basis, self.rels + self.genwds)
 
