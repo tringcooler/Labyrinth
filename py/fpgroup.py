@@ -335,6 +335,13 @@ class grp_coset(object):
                 self.trav_word(nwd, nsta, result)
         return result
 
+    def is_normal(self):
+        for h in self.subs:
+            for sta in xrange(len(self.tbl)):
+                if not sta == self.state(h, sta):
+                    return False
+        return True
+
     def __contains__(self, dst):
         if not (isinstance(dst, grp_coset) and self.basis == dst.basis):
             return False
@@ -376,8 +383,6 @@ class base_fp_group(object):
     def __eq__(self, dst):
         if not isinstance(dst, base_fp_group):
             return False
-        elif not (self.trans or self.filt or dst.trans or dst.filt):
-            return self.basis == dst.basis
         else:
             return self.trans == dst.trans and self.filt == dst.filt
 
@@ -531,6 +536,10 @@ class subgroup_of_fpgrp(base_fp_group):
     @property
     def index(self):
         return len(self.filt)
+
+    @lazyprop
+    def normal(self):
+        return self.filt.is_normal()
 
     @lazyprop
     def elems(self):
