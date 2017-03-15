@@ -427,7 +427,7 @@ class free_group(base_fp_group):
 
     @property
     def filt(self):
-        return None
+        return grp_coset(self.basis, self.gens)
 
     def has_element(self, dst):
         return dst in self.basis
