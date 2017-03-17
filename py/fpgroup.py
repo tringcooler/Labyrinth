@@ -373,8 +373,14 @@ class base_fp_group(object):
     def rels(self):
         return []
 
+    def has_subgroup(self, dst):
+        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
+
     def subgroup(self, gens):
         return subgroup_of_fpgrp(self, gens)
+
+    def normalclosure(self, gens):
+        return normalclosure_of_subgrp(self, gens)
 
     def quogroup(self, ker):
         raise TypeError('quotient invalid')
@@ -436,9 +442,6 @@ class free_group(base_fp_group):
 
     def has_element(self, dst):
         return dst in self.basis
-
-    def has_subgroup(self, dst):
-        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
 
     def quogroup(self, ker):
         if type(ker) in [tuple, list]:
@@ -568,6 +571,12 @@ class subgroup_of_fpgrp(base_fp_group):
     def has_element(self, dst):
         return dst in self.fpgroup and (
             self.filt.state(dst) == 0)
+
+    def has_subgroup(self, dst):
+        if not (isinstance(
+            dst, subgroup_of_fpgrp) and self.fpgroup == dst.fpgroup):
+            return False
+        return self.filt in dst.filt
 
     def subgroup(self, gens):
         for gen in gens:
