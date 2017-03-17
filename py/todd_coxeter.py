@@ -62,6 +62,10 @@ class gen_table(object):
 
     def confluent(self, sta1, sta2):
         #print 'con', sta1.id, sta2.id
+        if sta1 == sta2:
+            return
+        elif sta2.id == 0:
+            return self.confluent(sta2, sta1)
         record_req = []
         for gen_pair in xrange(self.gens):
             for gen in [gen_pair + 1, - gen_pair - 1]:
