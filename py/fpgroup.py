@@ -335,10 +335,13 @@ class grp_coset(object):
                 self.trav_word(nwd, nsta, result)
         return result
 
-    def is_normal(self):
+    def is_normal(self, genwds):
+        if not genwds:
+            genwds = self.basis.gens()
         for h in self.subs:
-            for sta in xrange(len(self.tbl)):
-                if not sta == self.state(h, sta):
+            for gen in genwds:
+                sta = self.state(gen)
+                if sta == None or not sta == self.state(h, sta):
                     return False
         return True
 
@@ -368,6 +371,10 @@ class grp_coset(object):
 
 @neq
 class base_fp_group(object):
+
+    @property
+    def genwds(self):
+        return []
 
     @property
     def rels(self):
@@ -446,7 +453,7 @@ class free_group(base_fp_group):
     def quogroup(self, ker):
         if type(ker) in [tuple, list]:
             return fp_group(self, ker)
-        elif self.has_subgroup(ker):
+        elif self.has_subgroup(ker) and ker.is_normal(self):
             rels = ker.genwds
             return fp_group(self, rels)
         else:
@@ -482,9 +489,6 @@ class fp_group(base_fp_group):
         return [fpgrp_element(
             self, w) for w in self.trans.trav_word(self.one.word)]
 
-    def has_element(self, dst):
-        return isinstance(dst, fpgrp_element) and self == dst.group
-
     @property
     def basis(self):
         return self.frgroup.basis
@@ -504,6 +508,18 @@ class fp_group(base_fp_group):
     @lazyprop
     def filt(self):
         return grp_coset(self.basis, self.frgroup.gens)
+
+    def has_element(self, dst):
+        return isinstance(dst, fpgrp_element) and self == dst.group
+
+    def quogroup(self, ker):
+        if self.has_subgroup(ker) and ker.is_normal(self):
+            #TODO
+            #rels = ker.genwds
+            #return fp_group(self, rels)
+            pass
+        else:
+            raise TypeError('quotient invalid')
 
 @roprop('fpgroup')
 @roprop('gens')
@@ -541,10 +557,6 @@ class subgroup_of_fpgrp(base_fp_group):
         return len(self.filt)
 
     @lazyprop
-    def normal(self):
-        return self.filt.is_normal()
-
-    @lazyprop
     def elems(self):
         return [e for e in self.fpgroup.elems if e in self]
 
@@ -577,6 +589,11 @@ class subgroup_of_fpgrp(base_fp_group):
             dst, subgroup_of_fpgrp) and self.fpgroup == dst.fpgroup):
             return False
         return self.filt in dst.filt
+
+    def is_normal(self, dst):
+        if not self.basis == dst.basis:
+            return False
+        return self.filt.is_normal(dst.genwds)
 
     def subgroup(self, gens):
         for gen in gens:
