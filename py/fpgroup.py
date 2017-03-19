@@ -381,7 +381,8 @@ class base_fp_group(object):
         return []
 
     def has_subgroup(self, dst):
-        return isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup
+        return self == dst or (
+            isinstance(dst, subgroup_of_fpgrp) and self == dst.fpgroup)
 
     def subgroup(self, gens):
         return subgroup_of_fpgrp(self, gens)
@@ -514,10 +515,7 @@ class fp_group(base_fp_group):
 
     def quogroup(self, ker):
         if self.has_subgroup(ker) and ker.is_normal(self):
-            #TODO
-            #rels = ker.genwds
-            #return fp_group(self, rels)
-            pass
+            return fp_group(self.frgroup, self.rels + ker.genwds)
         else:
             raise TypeError('quotient invalid')
 
@@ -600,6 +598,14 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in self:
                 raise ValueError("generator {0} is invalid".format(gen))
         return self.fpgroup.subgroup(gens)
+
+    def quogroup(self, ker):
+        if self.has_subgroup(ker) and ker.is_normal(self):
+            fpgrp = self.fpgroup.quogroup(ker)
+            gens = [fpgrp_element(fpgrp, w) for w in self.genwds]
+            return fpgrp.subgroup(gens)
+        else:
+            raise TypeError('quotient invalid')
 
 class normalclosure_of_subgrp(subgroup_of_fpgrp):
 
