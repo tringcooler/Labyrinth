@@ -278,8 +278,8 @@ class grp_coset(object):
         #print 'calc coset'
         coset_tbl = coset_table(
             len(self.basis),
-            [rel.num_resp() for rel in rels],
-            [sub.num_resp() for sub in subs])
+            [rel.num_resp() for rel in rels if len(rel) > 0],
+            [sub.num_resp() for sub in subs if len(sub) > 0])
         try:
             coset_tbl.run()
         except coset_tbl.noresult as ex:
@@ -343,6 +343,15 @@ class grp_coset(object):
                 sta = self.state(gen)
                 if sta == None or not sta == self.state(h, sta):
                     return False
+        return True
+
+    def is_trivial(self):
+        return self.finished and len(self.tbl) == 1
+
+    def is_open(self):
+        for gen in self.basis.gens():
+            if not self.state(gen) == None:
+                return False
         return True
 
     def __contains__(self, dst):
@@ -425,8 +434,18 @@ class free_group(base_fp_group):
         self._basis = basis
 
     def __len__(self):
-        #return float('inf')
-        raise OverflowError('infinity length')
+        if self.trivial:
+            return 1
+        else:
+            raise OverflowError('infinity length')
+
+    @property
+    def finite(self):
+        return self.trivial
+
+    @lazyprop
+    def trivial(self):
+        return not len(self.basis) > 0
 
     @property
     def gens(self):
@@ -438,7 +457,10 @@ class free_group(base_fp_group):
 
     @property
     def elems(self):
-        raise OverflowError('infinity group')
+        if self.trivial:
+            return [self.one]
+        else:
+            raise OverflowError('infinity group')
 
     @property
     def trans(self):
@@ -482,6 +504,14 @@ class fp_group(base_fp_group):
 
     def __len__(self):
         return len(self.trans)
+
+    @property
+    def finite(self):
+        return self.trans.finished
+
+    @lazyprop
+    def trivial(self):
+        return self.trans.is_trivial()
 
     @lazyprop
     def elems(self):
@@ -531,6 +561,8 @@ class subgroup_of_fpgrp(base_fp_group):
             return super(subgroup_of_fpgrp, cls).__new__(cls)
 
     def __init__(self, fpgrp, gens):
+        if not fpgrp.filt.is_trivial():
+            raise TypeError("fp-group shouldn't be subgroup resp")
         self._fpgroup = fpgrp
         self._gens = []
         for gen in gens:
@@ -545,10 +577,26 @@ class subgroup_of_fpgrp(base_fp_group):
             self._genwds = self.gens
 
     def __len__(self):
-        wlen = len(self.fpgroup)
-        index = self.index
-        assert wlen % index == 0
-        return wlen / index
+        if self.trivial:
+            return 1
+        else:
+            wlen = len(self.fpgroup)
+            index = self.index
+            assert wlen % index == 0
+            return wlen / index
+
+    @property
+    def finite(self):
+        return self.trivial or self.fpgroup.finite
+
+    @lazyprop
+    def trivial(self):
+        if self.filt.is_open():
+            return True
+        elif self.fpgroup.finite and self.filt.finished:
+            return len(self.fpgroup) == self.index
+        else:
+            return False
 
     @property
     def index(self):
@@ -556,7 +604,10 @@ class subgroup_of_fpgrp(base_fp_group):
 
     @lazyprop
     def elems(self):
-        return [e for e in self.fpgroup.elems if e in self]
+        if self.trivial:
+            return [self.one]
+        else:
+            return [e for e in self.fpgroup.elems if e in self]
 
     @property
     def basis(self):
@@ -598,6 +649,12 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in self:
                 raise ValueError("generator {0} is invalid".format(gen))
         return self.fpgroup.subgroup(gens)
+
+    def normalclosure(self, gens):
+        for gen in gens:
+            if not gen in self:
+                raise ValueError("generator {0} is invalid".format(gen))
+        return self.fpgroup.normalclosure(gens)
 
     def quogroup(self, ker):
         if self.has_subgroup(ker) and ker.is_normal(self):
