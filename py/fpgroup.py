@@ -455,7 +455,7 @@ class free_group(base_fp_group):
     def one(self):
         return self.basis.gen_num(0)
 
-    @property
+    @lazyprop
     def elems(self):
         if self.trivial:
             return [self.one]
