@@ -28,6 +28,23 @@ def iseq(hndl):
             return hndl(self, dst)
     return _eq
 
+def lazyeq(hndl):
+    def _eq(self, dst):
+        if self is dst:
+            return True
+        if not hasattr(self, '_eq_vchain'):
+            self._eq_vchain = vchain()
+        if not hasattr(dst, '_eq_vchain'):
+            dst._eq_vchain = vchain()
+        if self._eq_vchain == dst._eq_vchain:
+            return True
+        else:
+            rslt = hndl(self, dst)
+            if rslt:
+                self._eq_vchain.vlink(dst._eq_vchain)
+            return rslt
+    return _eq
+
 @neq
 class vchain(object):
 
