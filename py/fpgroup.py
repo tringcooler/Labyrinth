@@ -374,6 +374,7 @@ class grp_coset(object):
                 return True
             else:
                 rcs = 0
+        #for rcs in xrange(len(dst.tbl)):
         for rel in self.rels:
             if not dst.state(rel, rcs) == rcs:
                 return False
@@ -382,7 +383,7 @@ class grp_coset(object):
                 return False
         return True
 
-    @iseq
+    @lazyeq
     def __eq__(self, dst):
         return isinstance(dst, grp_coset) and self in dst and dst in self
 
@@ -688,7 +689,8 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         twd = dst_filt.trav_word(self.one.underlying)[1:]
         cst = grp_coset(self.basis, self.rels, genwds)
         for bswd in twd:
-            if len(cst) == len(dst_filt) and cst == dst_filt:
+            if (not (cst.finished and dst_filt.finished) or 
+                len(cst) == len(dst_filt)) and cst == dst_filt:
                 break
             for sub in subs:
                 w = sub ** bswd
