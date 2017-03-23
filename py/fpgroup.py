@@ -335,8 +335,10 @@ class grp_coset(object):
         if result == None:
             result = [None] * len(self)
             result[sta] = word
+        gens = self.basis.gens(True)
         trans = self.tbl[sta]
-        for w in trans:
+        for w in gens:
+            w = w.seq[0]
             nsta = trans[w]
             nwd = word * word.basis.gen(w)
             if result[nsta] == None:
@@ -672,30 +674,50 @@ class subgroup_of_fpgrp(base_fp_group):
 
 class normalclosure_of_subgrp(subgroup_of_fpgrp):
 
+    def __init__(self, fpgrp, gens):
+        self._need_calc = False
+        super(normalclosure_of_subgrp, self).__init__(fpgrp, gens)
+        self._need_calc = True
+
     def _calc(self):
+        #print 'calc filter'
+        gens = self._gens
         genwds = self._genwds
+        subs = list(genwds)
         dst_filt = grp_coset(self.basis, self.rels + genwds)
         twd = dst_filt.trav_word(self.one.underlying)[1:]
         cst = grp_coset(self.basis, self.rels, genwds)
-        for w in twd:
+        for bswd in twd:
             if len(cst) == len(dst_filt) and cst == dst_filt:
                 break
-            if not cst.state(w) == 0:
-                genwds.append(w)
-                cst = grp_coset(self.basis, self.rels, genwds)
+            for sub in subs:
+                w = sub ** bswd
+                if not cst.state(w) == 0:
+                    genwds.append(w)
+                    g = w.mapped(self.fpgroup.gens)
+                    assert g.underlying == w
+                    gens.append(g)
+                    cst = grp_coset(self.basis, self.rels, genwds)
+        else:
+            assert cst == dst_filt
         self._filt = cst
+        self._need_calc = False
 
-    #TODO gens recalc
+    @property
+    def gens(self):
+        if self._need_calc:
+            self._calc()
+        return self._gens
 
     @property
     def genwds(self):
-        if not hasattr(self, '_filt'):
+        if self._need_calc:
             self._calc()
         return self._genwds
 
     @property
     def filt(self):
-        if not hasattr(self, '_filt'):
+        if self._need_calc:
             self._calc()
         return self._filt
 
