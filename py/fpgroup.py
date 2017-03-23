@@ -121,6 +121,10 @@ class grp_word(object):
     def __len__(self):
         return len(self.seq)
 
+    @property
+    def underlying(self):
+        return self
+
     def exp_resp(self):
         wr = []
         cr = []
@@ -215,6 +219,10 @@ class fpgrp_element(object):
     @property
     def seq(self):
         return self.word.seq
+
+    @property
+    def underlying(self):
+        return self.word
         
     @lazyprop
     def state(self):
@@ -320,6 +328,7 @@ class grp_coset(object):
                 return None
         return sta
 
+    #TODO breadth-first order
     def trav_word(self, word, sta = None, result = None):
         if sta == None:
             sta = self.state(word)
@@ -571,10 +580,7 @@ class subgroup_of_fpgrp(base_fp_group):
             if not gen in self.gens:
                 self.gens.append(gen)
         self.gens.sort(key = lambda w: w.seq)
-        if isinstance(fpgrp, fp_group):
-            self._genwds = [g.word for g in self.gens]
-        else:
-            self._genwds = self.gens
+        self._genwds = [g.underlying for g in self.gens]
 
     def __len__(self):
         if self.trivial:
@@ -666,7 +672,30 @@ class subgroup_of_fpgrp(base_fp_group):
 
 class normalclosure_of_subgrp(subgroup_of_fpgrp):
 
-    @lazyprop
+    def _calc(self):
+        genwds = self._genwds
+        dst_filt = grp_coset(self.basis, self.rels + genwds)
+        twd = dst_filt.trav_word(self.one.underlying)[1:]
+        cst = grp_coset(self.basis, self.rels, genwds)
+        for w in twd:
+            if len(cst) == len(dst_filt) and cst == dst_filt:
+                break
+            if not cst.state(w) == 0:
+                genwds.append(w)
+                cst = grp_coset(self.basis, self.rels, genwds)
+        self._filt = cst
+
+    #TODO gens recalc
+
+    @property
+    def genwds(self):
+        if not hasattr(self, '_filt'):
+            self._calc()
+        return self._genwds
+
+    @property
     def filt(self):
-        return grp_coset(self.basis, self.rels + self.genwds)
+        if not hasattr(self, '_filt'):
+            self._calc()
+        return self._filt
 
