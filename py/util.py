@@ -55,24 +55,36 @@ class vchain(object):
             raise AttributeError(
                 "vchain has no attribute '{0}'".format(a))
         else:
-            return getattr(self.__succ, a)
+            #return getattr(self.__succ, a)
+            node = self
+            while not node.__succ is None:
+                node = node.__succ
+            return getattr(node, a)
 
     def __setattr__(self, a, v):
         if self.__succ is None:
             super(vchain, self).__setattr__(a, v)
         else:
-            self.__succ.__setattr__(a, v)
+            #self.__succ.__setattr__(a, v)
+            node = self
+            while not node.__succ is None:
+                node = node.__succ
+            return setattr(node, a, v)
 
     def __eq__(self, dest):
         if not type(self) == type(dest):
             return False
+        if self is dest:
+            return True
         if self.__succ is None and dest.__succ is None:
             return self is dest
-        if not self.__succ is None:
-            self = self.__succ
-        if not dest.__succ is None:
-            dest = dest.__succ
-        return self == dest
+        snode = self
+        while not snode.__succ is None:
+            snode = snode.__succ
+        dnode = dest
+        while not dnode.__succ is None:
+            dnode = dnode.__succ
+        return snode == dnode
 
     def __nonzero__(self):
         return True
@@ -82,5 +94,8 @@ class vchain(object):
             self.__dict__ = {}
             self.__succ = dst
         else:
-            if not self.__succ == dst:
-                self.__succ.vlink(dst)
+            node = self
+            while not node.__succ is None:
+                node = node.__succ
+            if not node == dst:
+                node.vlink(dst)
