@@ -333,18 +333,35 @@ class grp_coset(object):
         if sta == None:
             sta = self.state(word)
         if result == None:
-            result = [None] * len(self)
+            result = [None] * len(self.tbl)
             result[sta] = word
         gens = self.basis.gens(True)
         trans = self.tbl[sta]
         for w in gens:
             w = w.seq[0]
             nsta = trans[w]
+            if nsta == None:
+                continue
             nwd = word * word.basis.gen(w)
             if result[nsta] == None:
                 result[nsta] = nwd
                 self.trav_word(nwd, nsta, result)
         return result
+
+    def show(self):
+        gens = self.basis.gens(True)
+        def _s(s):
+            if s == None:
+                r = 'X'
+            else:
+                r = 'S' + str(s)
+            return r + ' ' * (4 - len(r))
+        for i in xrange(len(self.tbl)):
+            print _s(i) + '->',
+            for w in gens:
+                w = w.seq[0]
+                print w + ': ' +  _s(self.tbl[i][w]),
+            print
 
     def is_normal(self, genwds):
         if not genwds:
@@ -368,19 +385,19 @@ class grp_coset(object):
     def __contains__(self, dst):
         if not (isinstance(dst, grp_coset) and self.basis == dst.basis):
             return False
-        rcs = 1
+        #rcs = 1
         if len(dst.tbl) < 2:
             if dst.finished:
                 return True
-            else:
-                rcs = 0
-        #for rcs in xrange(len(dst.tbl)):
-        for rel in self.rels:
-            if not dst.state(rel, rcs) == rcs:
-                return False
+            #else:
+            #    rcs = 0
         for sub in self.subs:
             if not dst.state(sub, 0) == 0:
                 return False
+        for rcs in xrange(len(dst.tbl)):
+            for rel in self.rels:
+                if not dst.state(rel, rcs) == rcs:
+                    return False
         return True
 
     @lazyeq
@@ -681,14 +698,17 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         self._need_calc = True
 
     def _calc(self):
-        #print 'calc filter'
+        #print 'calc new filt'
         gens = self._gens
         genwds = self._genwds
         subs = list(genwds)
-        dst_filt = grp_coset(self.basis, self.rels + genwds)
-        twd = dst_filt.trav_word(self.one.underlying)[1:]
+        dst_filt = self.filt
         cst = grp_coset(self.basis, self.rels, genwds)
+        twd = cst.trav_word(self.one.underlying)[1:]
         for bswd in twd:
+            #cst.finished == dst_filt.finished
+            #and len(cst.tbl) == len(dst_filt.tbl)
+            #and cst == dst_filt
             if (not (cst.finished and dst_filt.finished) or 
                 len(cst) == len(dst_filt)) and cst == dst_filt:
                 break
@@ -700,6 +720,8 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
                     assert g.underlying == w
                     gens.append(g)
                     cst = grp_coset(self.basis, self.rels, genwds)
+                    print len(cst.tbl), len(dst_filt.tbl),
+                    print dst_filt.state(w), cst.state(w), w
         else:
             assert cst == dst_filt
         self._filt = cst
@@ -717,9 +739,8 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
             self._calc()
         return self._genwds
 
-    @property
+    @lazyprop
     def filt(self):
-        if self._need_calc:
-            self._calc()
-        return self._filt
+        #print 'prev filt'
+        return grp_coset(self.basis, self.rels + self._genwds)
 
