@@ -135,14 +135,15 @@ class coset_table(object):
         self._subtbl = [
             rel_chain(self.gentbl, sub) for sub in subs]
 
-    def run(self, max_idx = 50000):
+    def run(self, max_cosets = 50000):
         if len(self.gentbl):
             raise RuntimeError('already run')
         self.gentbl.alloc()
         sta_idx = 0
         while sta_idx < self.gentbl.statid:
-            if sta_idx > max_idx:
-                raise self.noresult(sta_idx)
+            if len(self.gentbl) > max_cosets:
+                self.gentbl.resort()
+                raise self.noresult(len(self.gentbl))
             try:
                 sta = self.gentbl.states[sta_idx]
             except KeyError:
