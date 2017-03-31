@@ -407,6 +407,55 @@ class grp_coset(object):
     def __nonzero__(self):
         return True
 
+@roprop('cst_tbl')
+@roprop('lp_tbl')
+@roprop('gidx')
+class grp_coset_loop_scoop(object):
+
+    def __init__(self, coset):
+        assert len(coset.tbl) > 0
+        self._cst_tbl = coset.tbl
+        self._gidx = {}
+        for i, g in zip(xrange(len(self.cst_tbl[0])), self.cst_tbl[0].keys()):
+            self.gidx[g] = i
+        self._lp_tbl = [[None for i in xrange(len(self.gidx))]
+                        for j in xrange(len(self.cst_tbl))]
+        self.wdidx = 0
+
+    def scoop(self, wd, st = 0):
+        sta = st
+        is_new = False
+        for w in wd.seq:
+            nsta = self.cst_tbl[sta][w]
+            assert not nsta == None
+            if self.lp_tbl[sta][self.gidx[w]] == None:
+                self.lp_tbl[sta][self.gidx[w]] = self.wdidx
+                is_new = True
+            invw = wd.basis.invers(w)
+            if self.lp_tbl[nsta][self.gidx[invw]] == None:
+                self.lp_tbl[nsta][self.gidx[invw]] = self.wdidx
+                is_new = True
+            sta = nsta
+        assert sta == st
+        if is_new:
+            self.wdidx += 1
+        return is_new
+
+    def unfinished(self):
+        cnt = 0
+        for t in self.lp_tbl:
+            for wi in t:
+                if wi == None:
+                    cnt += 1
+        return cnt
+
+    def is_finished(self):
+        for t in self.lp_tbl:
+            for wi in t:
+                if wi == None:
+                    return False
+        return True
+
 @neq
 class base_fp_group(object):
 
