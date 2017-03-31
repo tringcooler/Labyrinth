@@ -117,6 +117,22 @@ class grp_word(object):
     def __init__(self, wl, basis):
         self._basis = basis
         self._seq = wl
+        self._reduce()
+
+    def _reduce(self):
+        i = 0
+        while i < len(self.seq):
+            w = self.seq[i]
+            if not w in self.basis.elms:
+                raise ValueError("invalid word seq {0}".format(w))
+            if i + 1 < len(self.seq):
+                wn = self.seq[i + 1]
+                if self.basis.invers(w) == wn:
+                    self.seq.pop(i)
+                    self.seq.pop(i)
+                    if i > 0:
+                        i -= 2
+            i += 1
 
     def __len__(self):
         return len(self.seq)
@@ -329,13 +345,14 @@ class grp_coset(object):
         return sta
 
     #TODO breadth-first order
-    def trav_word(self, word, sta = None, result = None):
+    def trav_word(self, word, sta = None, result = None,
+                  loop_hndl = None, trac_inv = False):
         if sta == None:
             sta = self.state(word)
         if result == None:
             result = [None] * len(self.tbl)
             result[sta] = word
-        gens = self.basis.gens(True)
+        gens = self.basis.gens(trac_inv)
         trans = self.tbl[sta]
         for w in gens:
             w = w.seq[0]
@@ -343,9 +360,25 @@ class grp_coset(object):
             if nsta == None:
                 continue
             nwd = word * word.basis.gen(w)
+            #print 'touch', nwd,
             if result[nsta] == None:
+                #print 'node'
                 result[nsta] = nwd
-                self.trav_word(nwd, nsta, result)
+                self.trav_word(nwd, nsta, result, loop_hndl, trac_inv)
+            elif not loop_hndl == None and not result[nsta] == nwd:
+                #print 'loop'
+                loop_hndl(result[nsta], nwd)
+            else:
+                #print 'back'
+                pass
+        return result
+
+    def trav_loop(self, word, sta = None, result = None):
+        if result == None:
+            result = []
+        def _add_loop(wds, wdd):
+            result.append(wdd * wds ** -1)
+        self.trav_word(word, sta, loop_hndl = _add_loop, trac_inv = False)
         return result
 
     def show(self):
@@ -405,55 +438,6 @@ class grp_coset(object):
         return isinstance(dst, grp_coset) and self in dst and dst in self
 
     def __nonzero__(self):
-        return True
-
-@roprop('cst_tbl')
-@roprop('lp_tbl')
-@roprop('gidx')
-class grp_coset_loop_scoop(object):
-
-    def __init__(self, coset):
-        assert len(coset.tbl) > 0
-        self._cst_tbl = coset.tbl
-        self._gidx = {}
-        for i, g in zip(xrange(len(self.cst_tbl[0])), self.cst_tbl[0].keys()):
-            self.gidx[g] = i
-        self._lp_tbl = [[None for i in xrange(len(self.gidx))]
-                        for j in xrange(len(self.cst_tbl))]
-        self.wdidx = 0
-
-    def scoop(self, wd, st = 0):
-        sta = st
-        is_new = False
-        for w in wd.seq:
-            nsta = self.cst_tbl[sta][w]
-            assert not nsta == None
-            if self.lp_tbl[sta][self.gidx[w]] == None:
-                self.lp_tbl[sta][self.gidx[w]] = self.wdidx
-                is_new = True
-            invw = wd.basis.invers(w)
-            if self.lp_tbl[nsta][self.gidx[invw]] == None:
-                self.lp_tbl[nsta][self.gidx[invw]] = self.wdidx
-                is_new = True
-            sta = nsta
-        assert sta == st
-        if is_new:
-            self.wdidx += 1
-        return is_new
-
-    def unfinished(self):
-        cnt = 0
-        for t in self.lp_tbl:
-            for wi in t:
-                if wi == None:
-                    cnt += 1
-        return cnt
-
-    def is_finished(self):
-        for t in self.lp_tbl:
-            for wi in t:
-                if wi == None:
-                    return False
         return True
 
 @neq
@@ -746,46 +730,23 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         super(normalclosure_of_subgrp, self).__init__(fpgrp, gens)
         self._need_calc = True
 
-    def _calc(self):
-        #print 'calc new filt'
-        gens = self._gens
-        genwds = self._genwds
-        subs = list(genwds)
-        dst_filt = self.filt
-        cst = grp_coset(self.basis, self.rels, genwds)
-        twd = cst.trav_word(self.one.underlying)[1:]
-        for bswd in twd:
-            #cst.finished == dst_filt.finished
-            #and len(cst.tbl) == len(dst_filt.tbl)
-            #and cst == dst_filt
-            if (not (cst.finished and dst_filt.finished) or 
-                len(cst) == len(dst_filt)) and cst == dst_filt:
-                break
-            for sub in subs:
-                w = sub ** bswd
-                if not cst.state(w) == 0:
-                    genwds.append(w)
-                    g = w.mapped(self.fpgroup.gens)
-                    assert g.underlying == w
-                    gens.append(g)
-                    cst = grp_coset(self.basis, self.rels, genwds)
-                    print len(cst.tbl), len(dst_filt.tbl),
-                    print dst_filt.state(w), cst.state(w), w
-        else:
-            assert cst == dst_filt
-        self._filt = cst
+    def _recalc_gens(self):
+        genwds = self.filt.trav_loop(self.one.underlying)
+        genwds.sort(key = lambda w: w.seq)
+        self._genwds = genwds
+        self._gens = [w.mapped(self.fpgroup.gens) for w in genwds]
         self._need_calc = False
 
     @property
     def gens(self):
         if self._need_calc:
-            self._calc()
+            self._recalc_gens()
         return self._gens
 
     @property
     def genwds(self):
         if self._need_calc:
-            self._calc()
+            self._recalc_gens()
         return self._genwds
 
     @lazyprop
