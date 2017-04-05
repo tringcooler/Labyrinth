@@ -362,38 +362,65 @@ class grp_coset(object):
             if nsta == None:
                 continue
             nwd = word * word.basis.gen(w)
-            #print 'touch', nwd,
+            print 'touch1', nwd,
             if result[nsta] == None:
-                #print 'node'
+                print 'node'
                 result[nsta] = nwd
                 self.trav_word(nwd, nsta, result, loop_hndl, trac_inv)
             elif not loop_hndl == None and not result[nsta] == nwd:
-                #print 'loop'
+                print 'loop'
                 loop_hndl(result[nsta], nwd, nsta, sta, w)
             else:
-                #print 'back'
+                print 'back'
                 pass
         return result
 
-    def trav_loop(self, word = None, sta = None, result = None):
+    def touch_word(self, sta, touched_wd, remain_wd, result, loop_hndl = None):
+        if not len(remain_wd) > 0:
+            return
+        print 'touch2', touched_wd, remain_wd,
+        w = remain_wd.seq[0]
+        remain_wd = grp_word(remain_wd.seq[1:], remain_wd.basis)
+        touched_wd = grp_word(touched_wd.seq + [w], touched_wd.basis)
+        nsta = self.tbl[sta][w]
+        if result[nsta] == None:
+            print 'node'
+            result[nsta] = touched_wd
+            self.touch_word(nsta, touched_wd, remain_wd, result, loop_hndl)
+        elif not loop_hndl == None and not result[nsta] == touched_wd:
+            print 'loop'
+            loop_hndl(result[nsta], touched_wd, nsta, sta, w)
+        else:
+            print 'back'
+            pass
+
+    def trav_loop(self, word = None, sta = None, reserve_words = None):
         #print "trav loop"
-        if result == None:
-            result = []
+        result = []
         loop_tbl = [{} for _ in xrange(len(self.tbl))]
         def _add_loop(wds, wdd, nsta, sta, w):
             widx = (len(result), len(wdd))
+            iw = self.basis.invers(w)
+            assert sta == self.tbl[nsta][iw]
             assert not w in loop_tbl[sta]
             loop_tbl[sta][w] = widx
-            iw = self.basis.invers(w)
             assert not iw in loop_tbl[nsta]
             loop_tbl[nsta][iw] = widx
             result.append(wdd * wds ** -1)
-        self.trav_word(word, sta, loop_hndl = _add_loop, trac_inv = False)
+        words_result = None
+        if not reserve_words == None:
+            one = self.basis.gen_num(0)
+            words_result = [None] * len(self.tbl)
+            for rsv_word in reserve_words:
+                self.touch_word(0, one, rsv_word, words_result, _add_loop)
+        self.trav_word(word, sta, words_result,
+                       loop_hndl = _add_loop, trac_inv = False)
         return result, loop_tbl
 
     @lazyprop
     def lp_tbl(self):
-        return self.trav_loop(sta = 0)
+        reserve_words = self.subs + self.rels
+        return self.trav_loop(sta = 0, reserve_words = reserve_words)
 
     def loop_resolve(self, word):
         sta = 0
