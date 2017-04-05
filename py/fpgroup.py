@@ -345,8 +345,10 @@ class grp_coset(object):
         return sta
 
     #TODO breadth-first order
-    def trav_word(self, word, sta = None, result = None,
+    def trav_word(self, word = None, sta = None, result = None,
                   loop_hndl = None, trac_inv = False):
+        if word == None:
+            word = self.basis.gen_num(0)
         if sta == None:
             sta = self.state(word)
         if result == None:
@@ -367,19 +369,71 @@ class grp_coset(object):
                 self.trav_word(nwd, nsta, result, loop_hndl, trac_inv)
             elif not loop_hndl == None and not result[nsta] == nwd:
                 #print 'loop'
-                loop_hndl(result[nsta], nwd)
+                loop_hndl(result[nsta], nwd, nsta, sta, w)
             else:
                 #print 'back'
                 pass
         return result
 
-    def trav_loop(self, word, sta = None, result = None):
+    def trav_loop(self, word = None, sta = None, result = None):
+        #print "trav loop"
         if result == None:
             result = []
-        def _add_loop(wds, wdd):
+        loop_tbl = [{} for _ in xrange(len(self.tbl))]
+        def _add_loop(wds, wdd, nsta, sta, w):
+            widx = (len(result), len(wdd))
+            assert not w in loop_tbl[sta]
+            loop_tbl[sta][w] = widx
+            iw = self.basis.invers(w)
+            assert not iw in loop_tbl[nsta]
+            loop_tbl[nsta][iw] = widx
             result.append(wdd * wds ** -1)
         self.trav_word(word, sta, loop_hndl = _add_loop, trac_inv = False)
-        return result
+        return result, loop_tbl
+
+    @lazyprop
+    def lp_tbl(self):
+        return self.trav_loop(sta = 0)
+
+    def loop_resolve(self, word):
+        sta = 0
+        wseq = list(word.seq)
+        phase = 0
+        while True:
+            if not len(wseq) > 0:
+                break
+            w = wseq[0]
+            if phase == 0:
+                if w in self.lp_tbl[1][sta]:
+                    loop_widx = self.lp_tbl[1][sta][w]
+                    loop_word = self.lp_tbl[0][loop_widx[0]]
+                    lwseq = loop_word.seq[loop_widx[1]:]
+                    phase = 1
+            elif phase == 1:
+                if len(lwseq) > 0:
+                    lw = lwseq[0]
+                else:
+                    lw = None
+                if not w == lw:
+                    remain_lp_word = grp_word(lwseq, loop_word.basis)
+                    remain_word = grp_word(wseq, word.basis)
+                    comb_word = remain_lp_word ** -1 * remain_word
+                    return [loop_word] + self.loop_resolve(comb_word)
+                lwseq.pop(0)
+            wseq.pop(0)
+            sta = self.tbl[sta][w]
+            if sta == None:
+                raise ValueError("invalid word")
+            elif sta == 0:
+                if phase == 0:
+                    raise RuntimeError("uncovered word")
+                remain_word = grp_word(wseq, word.basis)
+                return [loop_word] + self.loop_resolve(remain_word)
+        if len(word) > 0:
+            return [word]
+        else:
+            return []
+
 
     def show(self):
         gens = self.basis.gens(True)
@@ -731,7 +785,8 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         self._need_calc = True
 
     def _recalc_gens(self):
-        genwds = self.filt.trav_loop(self.one.underlying)
+        #genwds, _ = self.filt.trav_loop(self.one.underlying)
+        genwds = list(self.filt.lp_tbl[0])
         genwds.sort(key = lambda w: w.seq)
         self._genwds = genwds
         self._gens = [w.mapped(self.fpgroup.gens) for w in genwds]
