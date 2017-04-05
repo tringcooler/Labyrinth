@@ -21,17 +21,19 @@ def lazyprop(hndl):
     return property(_getter)
 
 def iseq(hndl):
-    def _eq(self, dst):
+    def _iseq(self, dst):
         if self is dst:
             return True
         else:
             return hndl(self, dst)
-    return _eq
+    return _iseq
 
 def lazyeq(hndl):
-    def _eq(self, dst):
+    def _lazyeq(self, dst):
         if self is dst:
             return True
+        if not type(dst).__eq__.__name__ == '_lazyeq':
+            return hndl(self, dst)
         if not hasattr(self, '_eq_vchain'):
             self._eq_vchain = vchain()
         if not hasattr(dst, '_eq_vchain'):
@@ -43,7 +45,7 @@ def lazyeq(hndl):
             if rslt:
                 self._eq_vchain.vlink(dst._eq_vchain)
             return rslt
-    return _eq
+    return _lazyeq
 
 @neq
 class vchain(object):
