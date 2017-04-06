@@ -378,94 +378,88 @@ class grp_coset(object):
                 pass
         return result
 
-    def touch_word(self, sta, touched_wd, remain_wd, result, loop_hndl = None):
-        if not len(remain_wd) > 0:
-            return
-        print 'touch2', touched_wd, remain_wd,
-        w = remain_wd.seq[0]
-        remain_wd = grp_word(remain_wd.seq[1:], remain_wd.basis)
-        touched_wd = grp_word(touched_wd.seq + [w], touched_wd.basis)
-        nsta = self.tbl[sta][w]
-        if result[nsta] == None:
-            print 'node'
-            result[nsta] = touched_wd
-            self.touch_word(nsta, touched_wd, remain_wd, result, loop_hndl)
-        elif not loop_hndl == None and not result[nsta] == touched_wd:
-            print 'loop'
-            loop_hndl(result[nsta], touched_wd, nsta, sta, w)
-        else:
-            print 'back'
-            self.touch_word(nsta, touched_wd, remain_wd, result, loop_hndl)
-
-    def trav_loop(self, word = None, sta = None, reserve_words = None):
+    def trav_loop(self, word = None, sta = None):
         #print "trav loop"
         result = []
         loop_tbl = [{} for _ in xrange(len(self.tbl))]
         def _add_loop(wds, wdd, nsta, sta, w):
-            widx = (len(result), len(wdd))
+            wdr = wdd * wds ** -1
             iw = self.basis.invers(w)
             assert sta == self.tbl[nsta][iw]
-            if w in loop_tbl[sta] or iw in loop_tbl[nsta]:
-                return
             assert not w in loop_tbl[sta]
-            loop_tbl[sta][w] = widx
+            loop_tbl[sta][w] = (len(result), len(wdd), 1)
             assert not iw in loop_tbl[nsta]
-            loop_tbl[nsta][iw] = widx
-            result.append(wdd * wds ** -1)
-        if not reserve_words == None:
-            one = self.basis.gen_num(0)
-            words_result = [None] * len(self.tbl)
-            words_result[0] = one
-            for rsv_word in reserve_words:
-                self.touch_word(0, one, rsv_word, words_result, _add_loop)
-            print result
-            print loop_tbl
+            loop_tbl[nsta][iw] = (len(result), len(wdr) - len(wdd) + 1, -1)
+            result.append(wdr)
         self.trav_word(word, sta, loop_hndl = _add_loop, trac_inv = False)
         return result, loop_tbl
 
-    @lazyprop
-    def lp_tbl(self):
-        #reserve_words = self.subs + self.rels
-        return self.trav_loop(sta = 0)#, reserve_words = reserve_words)
-
-    def _loop_resolve(self, word):
-        sta = 0
-        wseq = list(word.seq)
-        phase = 0
-        while True:
-            if not len(wseq) > 0:
-                break
-            w = wseq[0]
-            if phase == 0:
+    def replace_loop_words(self, words):
+        key_sets = [set() for _ in words]
+        def _add_key(word, key_set):
+            sta = 0
+            for w in word.seq:
                 if w in self.lp_tbl[1][sta]:
-                    loop_widx = self.lp_tbl[1][sta][w]
-                    loop_word = self.lp_tbl[0][loop_widx[0]]
-                    lwseq = loop_word.seq[loop_widx[1]:]
-                    phase = 1
-            elif phase == 1:
-                if len(lwseq) > 0:
-                    lw = lwseq[0]
-                else:
-                    lw = None
-                if not w == lw:
-                    remain_lp_word = grp_word(lwseq, loop_word.basis)
-                    remain_word = grp_word(wseq, word.basis)
-                    comb_word = remain_lp_word ** -1 * remain_word
-                    return [loop_word] + self.loop_resolve(comb_word)
-                lwseq.pop(0)
-            wseq.pop(0)
-            sta = self.tbl[sta][w]
-            if sta == None:
-                raise ValueError("invalid word")
-            elif sta == 0:
-                if phase == 0:
-                    raise RuntimeError("uncovered word")
-                remain_word = grp_word(wseq, word.basis)
-                return [loop_word] + self.loop_resolve(remain_word)
-        if len(word) > 0:
-            return [word]
-        else:
-            return []
+                    key_set.add(self.lp_tbl[1][sta][w])
+                sta = self.tbl[sta][w]
+                if sta == None:
+                    raise ValueError("invalid word")
+        for wd, ks in zip(words, key_sets):
+            _add_key(wd, ks)
+        all_kidx = set(xrange(len(key_sets)))
+        edge_valid_kidx = set()
+        uni_sets = []
+        for i in xrange(len(key_sets)):
+            uset = set()
+            for j in xrange(len(key_sets)):
+                if i == j:
+                    continue
+                uset = uset.union(key_sets[j])
+            uni_set = key_sets[i].difference(uset)
+            if uni_set:
+                edge_valid_kidx.add(i)
+            uni_sets.append(uni_set)
+        if not edge_valid_kidx:
+            raise RuntimeError("bone shouldn't be closed")
+        key_choosen = [None] * len(key_sets)
+        while not edge_valid_kidx == all_kidx:
+            kidx = all_kidx.difference(edge_valid_kidx).pop()
+            for vkidx in edge_valid_kidx:
+                iset = key_sets[kidx].intersection(key_sets[vkidx])
+                if iset:
+                    key_choosen[kidx] = iset.pop()
+                    edge_valid_kidx.add(kidx)
+                    break
+        for i in xrange(len(key_sets)):
+            if key_choosen[i] == None:
+                key_choosen[i] = uni_sets[i].pop()
+        def _replace_widx(word, widx):
+            sta = 0
+            for i in xrange(len(word)):
+                w = word.seq[i]
+                if (w in self.lp_tbl[1][sta] and
+                    self.lp_tbl[1][sta][w] == widx):
+                    print 'replace'
+                    print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
+                    self.lp_tbl[1][sta][w] = (widx[0], i+1, 1)
+                    self.lp_tbl[0][widx[0]] = word
+                    iw = self.basis.invers(w)
+                    nsta = self.tbl[sta][w]
+                    self.lp_tbl[1][nsta][iw] = (widx[0], len(word) - i, -1)
+                    print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
+                    break
+                sta = self.tbl[sta][w]
+                if sta == None:
+                    raise ValueError("invalid word")
+        for i in xrange(len(key_sets)):
+            _replace_widx(words[i], key_choosen[i])
+
+    @property
+    def lp_tbl(self):
+        if not hasattr(self, '_lp_tbl'):
+            self._lp_tbl = self.trav_loop(sta = 0)
+            self.replace_loop_words(self.subs + self.rels)
+        return self._lp_tbl
 
     def loop_resolve(self, word):
         sta = 0
@@ -473,12 +467,17 @@ class grp_coset(object):
             w = word.seq[i]
             if w in self.lp_tbl[1][sta]:
                 loop_widx = self.lp_tbl[1][sta][w]
-                loop_word = self.lp_tbl[0][loop_widx[0]]
+                loop_word = self.lp_tbl[0][loop_widx[0]] ** loop_widx[2]
                 assert loop_widx[1] > 0
                 rplc_word = (
                     loop_word[:loop_widx[1]-1] ** -1 *
                     loop_word[loop_widx[1]:] ** -1)
                 comb_word = word[:i] * rplc_word * word[i+1:]
+                print '========'
+                print 'word', word, w, i
+                print 'loop_word', loop_word, loop_widx
+                print 'rplc_word', rplc_word
+                print 'comb_word', comb_word
                 return [loop_word] + self.loop_resolve(comb_word)
             sta = self.tbl[sta][w]
             if sta == None:
