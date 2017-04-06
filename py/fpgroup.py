@@ -439,14 +439,14 @@ class grp_coset(object):
                 w = word.seq[i]
                 if (w in self.lp_tbl[1][sta] and
                     self.lp_tbl[1][sta][w] == widx):
-                    print 'replace'
-                    print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
+                    #print 'replace'
+                    #print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
                     self.lp_tbl[1][sta][w] = (widx[0], i+1, 1)
                     self.lp_tbl[0][widx[0]] = word
                     iw = self.basis.invers(w)
                     nsta = self.tbl[sta][w]
                     self.lp_tbl[1][nsta][iw] = (widx[0], len(word) - i, -1)
-                    print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
+                    #print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
                     break
                 sta = self.tbl[sta][w]
                 if sta == None:
@@ -469,16 +469,16 @@ class grp_coset(object):
                 loop_widx = self.lp_tbl[1][sta][w]
                 loop_word = self.lp_tbl[0][loop_widx[0]] ** loop_widx[2]
                 assert loop_widx[1] > 0
-                rplc_word = (
-                    loop_word[:loop_widx[1]-1] ** -1 *
-                    loop_word[loop_widx[1]:] ** -1)
-                comb_word = word[:i] * rplc_word * word[i+1:]
-                print '========'
-                print 'word', word, w, i
-                print 'loop_word', loop_word, loop_widx
-                print 'rplc_word', rplc_word
-                print 'comb_word', comb_word
-                return [loop_word] + self.loop_resolve(comb_word)
+                comb_word1 = word[:i] * loop_word[:loop_widx[1]-1] ** -1
+                comb_word2 = loop_word[loop_widx[1]:] ** -1 * word[i+1:]
+                #print '========'
+                #print 'word', word, w, i
+                #print 'loop_word', loop_word, loop_widx
+                #print 'comb_word1', comb_word1
+                #print 'comb_word2', comb_word2
+                return (self.loop_resolve(comb_word1) +
+                        [loop_word] +
+                        self.loop_resolve(comb_word2))
             sta = self.tbl[sta][w]
             if sta == None:
                 raise ValueError("invalid word")
