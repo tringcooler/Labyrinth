@@ -205,6 +205,9 @@ class grp_word(object):
         else:
             return dst ** -1 * self * dst
 
+    def __getitem__(self, slc):
+        return type(self)(self.seq[slc], self.basis)
+
     def __str__(self):
         if not self.seq:
             return self.basis.id_elm
@@ -362,16 +365,16 @@ class grp_coset(object):
             if nsta == None:
                 continue
             nwd = word * word.basis.gen(w)
-            print 'touch1', nwd,
+            #print 'touch1', nwd,
             if result[nsta] == None:
-                print 'node'
+                #print 'node'
                 result[nsta] = nwd
                 self.trav_word(nwd, nsta, result, loop_hndl, trac_inv)
             elif not loop_hndl == None and not result[nsta] == nwd:
-                print 'loop'
+                #print 'loop'
                 loop_hndl(result[nsta], nwd, nsta, sta, w)
             else:
-                print 'back'
+                #print 'back'
                 pass
         return result
 
@@ -392,7 +395,7 @@ class grp_coset(object):
             loop_hndl(result[nsta], touched_wd, nsta, sta, w)
         else:
             print 'back'
-            pass
+            self.touch_word(nsta, touched_wd, remain_wd, result, loop_hndl)
 
     def trav_loop(self, word = None, sta = None, reserve_words = None):
         #print "trav loop"
@@ -402,27 +405,30 @@ class grp_coset(object):
             widx = (len(result), len(wdd))
             iw = self.basis.invers(w)
             assert sta == self.tbl[nsta][iw]
+            if w in loop_tbl[sta] or iw in loop_tbl[nsta]:
+                return
             assert not w in loop_tbl[sta]
             loop_tbl[sta][w] = widx
             assert not iw in loop_tbl[nsta]
             loop_tbl[nsta][iw] = widx
             result.append(wdd * wds ** -1)
-        words_result = None
         if not reserve_words == None:
             one = self.basis.gen_num(0)
             words_result = [None] * len(self.tbl)
+            words_result[0] = one
             for rsv_word in reserve_words:
                 self.touch_word(0, one, rsv_word, words_result, _add_loop)
-        self.trav_word(word, sta, words_result,
-                       loop_hndl = _add_loop, trac_inv = False)
+            print result
+            print loop_tbl
+        self.trav_word(word, sta, loop_hndl = _add_loop, trac_inv = False)
         return result, loop_tbl
 
     @lazyprop
     def lp_tbl(self):
-        reserve_words = self.subs + self.rels
-        return self.trav_loop(sta = 0, reserve_words = reserve_words)
+        #reserve_words = self.subs + self.rels
+        return self.trav_loop(sta = 0)#, reserve_words = reserve_words)
 
-    def loop_resolve(self, word):
+    def _loop_resolve(self, word):
         sta = 0
         wseq = list(word.seq)
         phase = 0
@@ -461,6 +467,26 @@ class grp_coset(object):
         else:
             return []
 
+    def loop_resolve(self, word):
+        sta = 0
+        for i in xrange(len(word)):
+            w = word.seq[i]
+            if w in self.lp_tbl[1][sta]:
+                loop_widx = self.lp_tbl[1][sta][w]
+                loop_word = self.lp_tbl[0][loop_widx[0]]
+                assert loop_widx[1] > 0
+                rplc_word = (
+                    loop_word[:loop_widx[1]-1] ** -1 *
+                    loop_word[loop_widx[1]:] ** -1)
+                comb_word = word[:i] * rplc_word * word[i+1:]
+                return [loop_word] + self.loop_resolve(comb_word)
+            sta = self.tbl[sta][w]
+            if sta == None:
+                raise ValueError("invalid word")
+        if len(word) > 0:
+            return [word]
+        else:
+            return []
 
     def show(self):
         gens = self.basis.gens(True)
