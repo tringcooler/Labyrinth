@@ -498,6 +498,7 @@ class grp_coset(object):
                 print w + ': ' +  _s(self.tbl[i][w]),
             print
 
+    #TODO
     def is_normal(self, genwds):
         if not genwds:
             genwds = self.basis.gens()
