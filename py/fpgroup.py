@@ -395,6 +395,29 @@ class grp_coset(object):
         return result, loop_tbl
 
     def replace_loop_words(self, words):
+        def _split_word(word):
+            sta = 0
+            for i in xrange(len(word)):
+                w = word.seq[i]
+                sta = self.tbl[sta][w]
+                if sta == None:
+                    raise ValueError("invalid word")
+                elif sta == 0:
+                    return [word[:i+1]] + _split_word(word[i+1:])
+            if len(word) > 0:
+                return [word]
+            else:
+                return []
+        def _strip_words(words):
+            r = []
+            for word in words:
+                 for wd in _split_word(word):
+                     if not wd in r:
+                         r.append(wd)
+            return r
+        #print words
+        words = _strip_words(words)
+        print words
         key_sets = [set() for _ in words]
         def _add_key(word, key_set):
             sta = 0
@@ -430,6 +453,8 @@ class grp_coset(object):
                     key_choosen[kidx] = iset.pop()
                     edge_valid_kidx.add(kidx)
                     break
+            else:
+                raise RuntimeError("unsolved loop relation")
         for i in xrange(len(key_sets)):
             if key_choosen[i] == None:
                 key_choosen[i] = uni_sets[i].pop()
