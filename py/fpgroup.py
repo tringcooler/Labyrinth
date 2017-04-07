@@ -395,29 +395,8 @@ class grp_coset(object):
         return result, loop_tbl
 
     def replace_loop_words(self, words):
-        def _split_word(word):
-            sta = 0
-            for i in xrange(len(word)):
-                w = word.seq[i]
-                sta = self.tbl[sta][w]
-                if sta == None:
-                    raise ValueError("invalid word")
-                elif sta == 0:
-                    return [word[:i+1]] + _split_word(word[i+1:])
-            if len(word) > 0:
-                return [word]
-            else:
-                return []
-        def _strip_words(words):
-            r = []
-            for word in words:
-                 for wd in _split_word(word):
-                     if not wd in r:
-                         r.append(wd)
-            return r
-        #print words
-        words = _strip_words(words)
-        print words
+        if not len(words) > 0:
+            return
         key_sets = [set() for _ in words]
         def _add_key(word, key_set):
             sta = 0
@@ -464,14 +443,11 @@ class grp_coset(object):
                 w = word.seq[i]
                 if (w in self.lp_tbl[1][sta] and
                     self.lp_tbl[1][sta][w] == widx):
-                    #print 'replace'
-                    #print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
                     self.lp_tbl[1][sta][w] = (widx[0], i+1, 1)
                     self.lp_tbl[0][widx[0]] = word
                     iw = self.basis.invers(w)
                     nsta = self.tbl[sta][w]
                     self.lp_tbl[1][nsta][iw] = (widx[0], len(word) - i, -1)
-                    #print self.lp_tbl[1][sta][w], self.lp_tbl[0][widx[0]]
                     break
                 sta = self.tbl[sta][w]
                 if sta == None:
@@ -483,7 +459,7 @@ class grp_coset(object):
     def lp_tbl(self):
         if not hasattr(self, '_lp_tbl'):
             self._lp_tbl = self.trav_loop(sta = 0)
-            self.replace_loop_words(self.subs + self.rels)
+            self.replace_loop_words(self.subs)
         return self._lp_tbl
 
     def loop_resolve(self, word):
@@ -496,11 +472,6 @@ class grp_coset(object):
                 assert loop_widx[1] > 0
                 comb_word1 = word[:i] * loop_word[:loop_widx[1]-1] ** -1
                 comb_word2 = loop_word[loop_widx[1]:] ** -1 * word[i+1:]
-                #print '========'
-                #print 'word', word, w, i
-                #print 'loop_word', loop_word, loop_widx
-                #print 'comb_word1', comb_word1
-                #print 'comb_word2', comb_word2
                 return (self.loop_resolve(comb_word1) +
                         [loop_word] +
                         self.loop_resolve(comb_word2))
@@ -549,12 +520,9 @@ class grp_coset(object):
     def __contains__(self, dst):
         if not (isinstance(dst, grp_coset) and self.basis == dst.basis):
             return False
-        #rcs = 1
         if len(dst.tbl) < 2:
             if dst.finished:
                 return True
-            #else:
-            #    rcs = 0
         for sub in self.subs:
             if not dst.state(sub, 0) == 0:
                 return False
@@ -862,7 +830,7 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         self._need_calc = True
 
     def _recalc_gens(self):
-        #genwds, _ = self.filt.trav_loop(self.one.underlying)
+        self.filt.replace_loop_words(self.filt.rels)
         genwds = list(self.filt.lp_tbl[0])
         genwds.sort(key = lambda w: w.seq)
         self._genwds = genwds
