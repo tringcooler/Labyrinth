@@ -462,6 +462,12 @@ class grp_coset(object):
             self.replace_loop_words(self.subs)
         return self._lp_tbl
 
+    def recalc_subs(self, subs, rels = None):
+        self.replace_loop_words(subs)
+        self._subs = self.lp_tbl[0]
+        if not rels == None:
+            self._rels = rels
+
     def loop_resolve(self, word):
         sta = 0
         for i in xrange(len(word)):
@@ -498,7 +504,6 @@ class grp_coset(object):
                 print w + ': ' +  _s(self.tbl[i][w]),
             print
 
-    #TODO
     def is_normal(self, genwds):
         if not genwds:
             genwds = self.basis.gens()
@@ -831,8 +836,8 @@ class normalclosure_of_subgrp(subgroup_of_fpgrp):
         self._need_calc = True
 
     def _recalc_gens(self):
-        self.filt.replace_loop_words(self.filt.rels)
-        genwds = list(self.filt.lp_tbl[0])
+        self.filt.recalc_subs(self._genwds, rels = self.rels)
+        genwds = list(self.filt.subs)
         genwds.sort(key = lambda w: w.seq)
         self._genwds = genwds
         self._gens = [w.mapped(self.fpgroup.gens) for w in genwds]
