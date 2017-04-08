@@ -468,7 +468,7 @@ class grp_coset(object):
         if not rels == None:
             self._rels = rels
 
-    def loop_resolve(self, word):
+    def loop_resolve(self, word, hndl = None):
         sta = 0
         for i in xrange(len(word)):
             w = word.seq[i]
@@ -478,16 +478,36 @@ class grp_coset(object):
                 assert loop_widx[1] > 0
                 comb_word1 = word[:i] * loop_word[:loop_widx[1]-1] ** -1
                 comb_word2 = loop_word[loop_widx[1]:] ** -1 * word[i+1:]
-                return (self.loop_resolve(comb_word1) +
-                        [loop_word] +
-                        self.loop_resolve(comb_word2))
+                if hndl == None:
+                    rslt = loop_word
+                else:
+                    rslt = hndl(loop_word, loop_widx)
+                return (self.loop_resolve(comb_word1, hndl) +
+                        [rslt] +
+                        self.loop_resolve(comb_word2, hndl))
             sta = self.tbl[sta][w]
             if sta == None:
                 raise ValueError("invalid word")
         if len(word) > 0:
-            return [word]
+            if hndl == None:
+                return [word]
+            else:
+                return [hndl(word, None)]
         else:
             return []
+
+    def genwds_maptbl(self, genwds):
+        if not len(genwds) >= len(self.lp_tbl[0]):
+            raise ValueError("too few genwds")
+        maptbl = [None] * len(self.lp_tbl[0])
+        for i in xrange(len(self.lp_tbl[0])):
+            w = self.lp_tbl[0][i]
+            try:
+                gidx = genwds.index(w)
+            except ValueError:
+                raise ValueError("invalid genwds")
+            maptbl[i] = gidx
+        return maptbl
 
     def show(self):
         gens = self.basis.gens(True)
@@ -568,6 +588,12 @@ class base_fp_group(object):
 
     def quogroup(self, ker):
         raise TypeError('quotient invalid')
+
+    def resolve_elem(self, elem):
+        return elem.underlying
+
+    def rebuild_elem(self, re_word):
+        return re_word.mapped(self.gens)
 
     @iseq
     def __eq__(self, dst):
@@ -827,6 +853,24 @@ class subgroup_of_fpgrp(base_fp_group):
             return fpgrp.subgroup(gens)
         else:
             raise TypeError('quotient invalid')
+
+    @lazyprop
+    def _genwds_maptbl(self):
+        return self.filt.genwds_maptbl(self.genwds)
+
+    @lazyprop
+    def _genwds_basis(self):
+        return grp_word_basis(
+            ['gen' + str(i) for i in xrange(len(self.genwds))])
+
+    def resolve_elem(self, elem):
+        if not elem in self:
+            raise ValueError("{0} is not elem of group".format(elem))
+        def _hndl(word, widx):
+            n = (self._genwds_maptbl[widx[0]] + 1) * widx[2]
+            return self._genwds_basis.gen_num(n)
+        r = self.filt.loop_resolve(elem.underlying, _hndl)
+        return reduce(lambda a, b: a * b, r)
 
 class normalclosure_of_subgrp(subgroup_of_fpgrp):
 
