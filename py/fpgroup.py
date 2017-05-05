@@ -400,14 +400,16 @@ class grp_coset(object):
         key_sets = [set() for _ in words]
         def _add_key(word, key_set):
             sta = 0
+            _1st = True
             for w in word.seq:
+                if sta == 0 and not _1st:
+                    raise ValueError("word more than 1 loop")
+                _1st = False
                 if w in self.lp_tbl[1][sta]:
                     key_set.add(self.lp_tbl[1][sta][w])
                 sta = self.tbl[sta][w]
                 if sta == None:
                     raise ValueError("invalid word")
-                elif sta == 0:
-                    raise ValueError("word more than 1 loop")
         for wd, ks in zip(words, key_sets):
             _add_key(wd, ks)
         all_kidx = set(xrange(len(key_sets)))
