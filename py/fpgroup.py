@@ -406,6 +406,8 @@ class grp_coset(object):
                 sta = self.tbl[sta][w]
                 if sta == None:
                     raise ValueError("invalid word")
+                elif sta == 0:
+                    raise ValueError("word more than 1 loop")
         for wd, ks in zip(words, key_sets):
             _add_key(wd, ks)
         all_kidx = set(xrange(len(key_sets)))
