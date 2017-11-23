@@ -93,8 +93,12 @@ class vchain(object):
 
     def vlink(self, dst):
         if self.__succ is None:
-            self.__dict__ = {}
-            self.__succ = dst
+            node = dst
+            while not node.__succ is None:
+                node = node.__succ
+            if not node is self:
+                self.__dict__ = {}
+                self.__succ = dst
         else:
             node = self
             while not node.__succ is None:
