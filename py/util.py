@@ -14,11 +14,15 @@ def neq(cls):
 
 def lazyprop(hndl):
     nm = '_' + hndl.__name__
+    dnm = nm + '_dirty'
     def _getter(self):
-        if not hasattr(self, nm):
+        if not hasattr(self, nm) or getattr(self, dnm):
             setattr(self, nm, hndl(self))
+            setattr(self, dnm, False)
         return getattr(self, nm)
-    return property(_getter)
+    def _setter(self, v):
+        setattr(self, dnm, True)
+    return property(_getter, _setter)
 
 def iseq(hndl):
     def _iseq(self, dst):
