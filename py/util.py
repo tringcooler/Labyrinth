@@ -32,6 +32,16 @@ def lazypropds(hndl):
         setattr(self, dnm, True)
     return property(_getter, _setter)
 
+def lazypropdd(hndl):
+    nm = '_' + hndl.__name__
+    def _getter(self):
+        if not hasattr(self, nm):
+            setattr(self, nm, hndl(self))
+        return getattr(self, nm)
+    def _setter(self, v):
+        delattr(self, nm)
+    return property(_getter, _setter)
+
 def lazypropdh(hndl):
     nm = '_' + hndl.__name__
     dnm = hndl.__name__ + '_dirty'
