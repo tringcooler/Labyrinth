@@ -39,7 +39,8 @@ def lazypropdd(hndl):
             setattr(self, nm, hndl(self))
         return getattr(self, nm)
     def _setter(self, v):
-        delattr(self, nm)
+        if hasattr(self, nm):
+            delattr(self, nm)
     return property(_getter, _setter)
 
 def lazypropdh(hndl):
