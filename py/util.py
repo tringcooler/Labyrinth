@@ -14,6 +14,14 @@ def neq(cls):
 
 def lazyprop(hndl):
     nm = '_' + hndl.__name__
+    def _getter(self):
+        if not hasattr(self, nm):
+            setattr(self, nm, hndl(self))
+        return getattr(self, nm)
+    return property(_getter)
+
+def lazypropds(hndl):
+    nm = '_' + hndl.__name__
     dnm = nm + '_dirty'
     def _getter(self):
         if not hasattr(self, nm) or getattr(self, dnm):
@@ -23,6 +31,16 @@ def lazyprop(hndl):
     def _setter(self, v):
         setattr(self, dnm, True)
     return property(_getter, _setter)
+
+def lazypropdh(hndl):
+    nm = '_' + hndl.__name__
+    dnm = hndl.__name__ + '_dirty'
+    def _getter(self):
+        if not hasattr(self, nm) or (
+            hasattr(self, dnm) and getattr(self, dnm)()):
+            setattr(self, nm, hndl(self))
+        return getattr(self, nm)
+    return property(_getter)
 
 def iseq(hndl):
     def _iseq(self, dst):
